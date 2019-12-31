@@ -1,6 +1,6 @@
 # maven-settings-xml-action
 
-Github Action to update maven ~/.m2/settings.xml
+Github Action to create maven settings (`~/.m2/settings.xml`)
 
 [![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action)
 
