@@ -1,9 +1,8 @@
 on: [push]
 
 jobs:
-  hello_world_job:
+  test_job:
     runs-on: ubuntu-latest
-    name: A job to say hello
     steps:
 
     - uses: actions/checkout@v1
@@ -12,6 +11,9 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
+        
+    - name: Build with Maven
+      run: mvn -B package --file pom.xml
 
     - name: Hello world action step
       id: hello
