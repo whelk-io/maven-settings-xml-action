@@ -7,7 +7,7 @@ jobs:
 
     - name: Hello world action step
       id: hello
-      uses: whelk-io/maven-settings-xml-action@v6
+      uses: whelk-io/maven-settings-xml-action@v7
       with:
         repositories: '[{"id": "github-flesch-kincaid", "url": "https://maven.pkg.github.com/whelk-io/flesch-kincaid"}]'
 
