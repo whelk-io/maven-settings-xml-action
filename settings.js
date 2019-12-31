@@ -22,7 +22,31 @@ function writeSettings(settingsPath, templateXml) {
     fs.writeFileSync(settingsPath, settingStr);
 }
 
+function updateServers(templateXml) {
+
+    const servers = core.getInput('servers');
+    core.info("servers " + servers); // TODO
+
+    if (!servers) {
+        return;
+    }
+
+    const serversXml = template.getElementsByTagName('servers')[0];
+
+    JSON.parse(servers).forEach((server) => {
+        const serverXml = template.createElement('server');
+        for (const key in server) {
+            const keyXml = template.createElement(key);
+            keyXml.textContent = server[key];
+            serverXml.appendChild(keyXml);
+        }
+        serversXml.appendChild(serverXml);
+    });
+
+}
+
 module.exports = {
     getSettingsTemplate,
-    writeSettings
+    writeSettings,
+    updateServers
 }

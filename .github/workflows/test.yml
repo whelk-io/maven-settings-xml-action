@@ -5,14 +5,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Hello world action step
-      id: hello
+    - name: Create maven settings.xml
       uses: whelk-io/maven-settings-xml-action@v12
       with:
+        servers: '[{"id": "github-flesch-kincaid", "username": "zteater", "password": "pass" }]'
         repositories: '[{"id": "github-flesch-kincaid", "url": "https://maven.pkg.github.com/whelk-io/flesch-kincaid"}]'
 
     - run: |
         cat ~/.m2/settings.xml
 
-    - name: Get the output time
-      run: echo "The time was ${{ steps.hello.outputs.time }}"

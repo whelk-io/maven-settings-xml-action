@@ -4,13 +4,9 @@ branding:
   icon: feather
   color: orange
 inputs:
-  who-to-greet:  # id of input
-    description: 'Who to greet'
-    required: true
-    default: 'World'
-outputs:
-  time: # id of output
-    description: 'The time we greeted you'
+  servers:
+    description: 'json array of servers to add to settings.xml'
+    required: false
 runs:
   using: 'node12'
   main: 'index.js'

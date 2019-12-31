@@ -20,6 +20,7 @@ try {
   const templateXml = settings.getSettingsTemplate();
 
   const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
+  settings.updateServers(templateXml);
   settings.writeSettings(settingsPath, templateXml);
 
 } catch (error) {
