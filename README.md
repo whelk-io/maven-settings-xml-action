@@ -26,7 +26,6 @@ with:
 npm i mocha
 npm i @actions/core
 npm i xmldom
-npm i xpath
 npm i path
 npm i os
 ````
