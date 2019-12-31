@@ -7,9 +7,12 @@ jobs:
 
     - name: Hello world action step
       id: hello
-      uses: whelk-io/maven-settings-xml-action@v8
+      uses: whelk-io/maven-settings-xml-action@v9
       with:
         repositories: '[{"id": "github-flesch-kincaid", "url": "https://maven.pkg.github.com/whelk-io/flesch-kincaid"}]'
+
+    - run: |
+        cat ~/.m2/settings.xml
 
     - name: Get the output time
       run: echo "The time was ${{ steps.hello.outputs.time }}"
