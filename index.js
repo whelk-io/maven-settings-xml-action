@@ -1,9 +1,9 @@
 const core = require('@actions/core');
-const github = require('@actions/github');
+//const github = require('@actions/github');
 const settings = require('./settings');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+//const fs = require('fs');
+//const os = require('os');
+//const path = require('path');
 
 async function run() {
   try {
@@ -17,10 +17,11 @@ async function run() {
     //console.log(`The event payload: ${payload}`);
 
     /////////
-    const settingsTemplate = settings.getSettingsTemplate();
+    //const settingsTemplate = 
+    settings.getSettingsTemplate();
 
-    const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
-    settings.writeSettings(settingsPath, templateXml);
+    //const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
+    //settings.writeSettings(settingsPath, templateXml);
 
   } catch (error) {
     core.setFailed(error.message);
