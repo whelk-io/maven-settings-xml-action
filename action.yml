@@ -1,5 +1,5 @@
 name: 'maven-settings-xml-action'
-description: 'Update maven ~/.m2/settings.xml'
+description: 'Update maven settings (~/.m2/settings.xml)'
 branding: 
   icon: feather
   color: orange
