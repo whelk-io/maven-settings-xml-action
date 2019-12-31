@@ -19,8 +19,8 @@ try {
   //const settingsTemplate = 
   const templateXml = settings.getSettingsTemplate();
 
-  //const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
-  //settings.writeSettings(settingsPath, templateXml);
+  const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
+  settings.writeSettings(settingsPath, templateXml);
 
 } catch (error) {
   core.setFailed(error.message);
