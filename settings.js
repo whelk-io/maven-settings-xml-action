@@ -21,3 +21,8 @@ function writeSettings(settingsPath, templateXml) {
     const settingStr = new XMLSerializer().serializeToString(templateXml);
     fs.writeFileSync(settingsPath, settingStr);
 }
+
+module.exports = {
+    getSettingsTemplate,
+    writeSettings
+}
