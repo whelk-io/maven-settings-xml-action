@@ -14,8 +14,9 @@ Github Action to update maven ~/.m2/settings.xml
 ## Example usage
 
 ````yaml
-uses: whelk-io/maven-settings-xml-action@v1
-with:
-  repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
-  servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
+- name: maven-settings-xml-action
+  uses: whelk-io/maven-settings-xml-action@v2
+  with:
+    repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
+    servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
