@@ -11,5 +11,8 @@ jobs:
       with:
         repositories: '[{"id": "github-flesch-kincaid", "url": "https://maven.pkg.github.com/whelk-io/flesch-kincaid"}]'
 
+    - run: |
+        cat ~/.m2/settings.xml
+
     - name: Get the output time
       run: echo "The time was ${{ steps.hello.outputs.time }}"
