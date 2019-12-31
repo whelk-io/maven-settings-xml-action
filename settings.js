@@ -9,6 +9,7 @@ function getSettingsTemplate() {
     //const templatePath = path.join(__dirname, 'template', 'settings.xml');
     //const template = fs.readFileSync(templatePath).toString();
     //return new DOMParser().parseFromString(template, 'text/xml');
+    return null;
 }
 
 //function writeSettings(settingsPath, templateXml) {
