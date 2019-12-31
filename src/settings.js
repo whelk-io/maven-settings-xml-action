@@ -3,7 +3,6 @@ var path = require('path');
 var fs = require('fs');
 var DOMParser = require('xmldom').DOMParser;
 var XMLSerializer = require('xmldom').XMLSerializer;
-var xpath = require('xpath');
 
 function getSettingsTemplate() {
     core.info("opening settings template");
@@ -51,7 +50,9 @@ function updateRepositories(templateXml) {
         return;
     }
 
-    var repositoriesXml = xpath.select(`/settings/profiles/profile[1]/repositories`, templateXml)[0];
+    var repositoriesXml = 
+        templateXml.getElementsByTagName('profiles')[0]
+                   .getElementsByTagName('repositories')[0];
 
     JSON.parse(repositoriesInput).forEach((repositoryInput) => {
         var repositoryXml = templateXml.createElement('repository');
@@ -62,7 +63,6 @@ function updateRepositories(templateXml) {
         }
         repositoriesXml.appendChild(repositoryXml);
     });
-
 }
 
 module.exports = {

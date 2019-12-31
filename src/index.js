@@ -1,16 +1,28 @@
-const core = require('@actions/core');
-const settings = require('./settings');
-const os = require('os');
-const path = require('path');
+var core = require('@actions/core');
+var settings = require('./settings');
+var os = require('os');
+var path = require('path');
 
-try {
-  const templateXml = settings.getSettingsTemplate();
+function run() {
+  try {
+    // open default template
+    var templateXml = settings.getSettingsTemplate();
 
-  const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
-  settings.updateServers(templateXml);
-  settings.updateRepositories(templateXml);
-  settings.writeSettings(settingsPath, templateXml);
+    // update from action input
+    settings.updateServers(templateXml);
+    settings.updateRepositories(templateXml);
 
-} catch (error) {
-  core.setFailed(error.message);
+    // write template to filepath
+    var settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
+    settings.writeSettings(settingsPath, templateXml);
+
+  } catch (error) {
+    core.setFailed(error.message);
+  }
+}
+
+run();
+
+module.exports = {
+  run
 }
