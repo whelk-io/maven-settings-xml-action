@@ -23,7 +23,7 @@ Github Action to update maven ~/.m2/settings.xml
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
 
-## Example `settings.xml`
+## Example settings.xml
 
 ````xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" 
