@@ -2,6 +2,7 @@ name: 'Update maven ~/.m2/settings.xml'
 description: 'Greet someone and record the time'
 branding: 
   icon: feather
+  color: orange
 inputs:
   who-to-greet:  # id of input
     description: 'Who to greet'
