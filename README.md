@@ -20,15 +20,10 @@ uses: actions/hello-world-javascript-action@v1
 with:
   who-to-greet: 'Mona the Octocat'
 
------
 
-
-## NPM Install
+npm i mocha
 npm i @actions/core
-npm i @actions/github
-npm i os
-npm i fs
-npm i path 
 npm i xmldom
-
-
+npm i xpath
+npm i path
+npm i os

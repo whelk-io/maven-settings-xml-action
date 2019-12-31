@@ -1,5 +1,5 @@
-name: 'Update maven ~/.m2/settings.xml'
-description: 'Greet someone and record the time'
+name: 'maven-settings-xml-action'
+description: 'Update maven ~/.m2/settings.xml'
 branding: 
   icon: feather
   color: orange
@@ -7,6 +7,9 @@ inputs:
   servers:
     description: 'json array of servers to add to settings.xml'
     required: false
+  repositories:
+    description: 'json array of repositories to add to settings.xml'
+    required: false
 runs:
   using: 'node12'
-  main: 'index.js'
+  main: 'src/index.js'

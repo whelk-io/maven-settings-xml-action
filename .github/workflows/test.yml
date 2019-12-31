@@ -8,8 +8,8 @@ jobs:
     - name: Create maven settings.xml 14
       uses: whelk-io/maven-settings-xml-action@v14
       with:
-        servers: '[{"id": "github-flesch-kincaid", "username": "zteater", "password": "pass" }]'
-        repositories: '[{"id": "github-flesch-kincaid", "url": "https://maven.pkg.github.com/whelk-io/flesch-kincaid"}]'
+        servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
+        repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
 
     - run: |
         cat ~/.m2/settings.xml

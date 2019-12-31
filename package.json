@@ -1,28 +1,31 @@
 {
   "name": "maven-settings-xml-action",
   "version": "1.0.0",
-  "description": "This action prints \"Hello World\" or \"Hello\" + the name of a person to greet to the log.",
+  "description": "Update maven ~/.m2/settings.xml",
   "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "@actions/core": "^1.2.0",
+    "mocha": "^6.2.2",
+    "os": "^0.1.1",
+    "path": "^0.12.7",
+    "xmldom": "^0.2.1",
+    "xpath": "0.0.27"
+  },
+  "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/whelk-io/maven-settings-xml-action.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Zack Teater",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/whelk-io/maven-settings-xml-action/issues"
   },
-  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme",
-  "dependencies": {
-    "@actions/core": "^1.2.0",
-    "@actions/github": "^2.0.0",
-    "fs": "0.0.1-security",
-    "os": "^0.1.1",
-    "path": "^0.12.7",
-    "xmldom": "^0.2.1"
-  }
+  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme"
 }
