@@ -5,8 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Create maven settings.xml 15
-      uses: whelk-io/maven-settings-xml-action@v15
+    - name: Create maven settings.xml 16
+      uses: whelk-io/maven-settings-xml-action@v16
       with:
         servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
         repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
