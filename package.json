@@ -7,11 +7,11 @@
     "test": "test"
   },
   "dependencies": {
-    "@actions/core": "^1.1.0",
+    "@actions/core": "^1.2.0",
     "fs": "0.0.1-security",
     "mocha": "^6.2.2",
     "os": "^0.1.1",
-    "path": "^0.12.7",
+    "path": "^0.12.6",
     "xmldom": "^0.2.1"
   },
   "devDependencies": {},
