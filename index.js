@@ -1,6 +1,6 @@
 const core = require('@actions/core');
 //const github = require('@actions/github');
-const settings = require('./settings').default;
+const settings = require('./settings');
 //const fs = require('fs');
 //const os = require('os');
 //const path = require('path');
