@@ -31,12 +31,12 @@ function updateServers(templateXml) {
         return;
     }
 
-    const serversXml = template.getElementsByTagName('servers')[0];
+    const serversXml = templateXml.getElementsByTagName('servers')[0];
 
     JSON.parse(servers).forEach((server) => {
-        const serverXml = template.createElement('server');
+        const serverXml = templateXml.createElement('server');
         for (const key in server) {
-            const keyXml = template.createElement(key);
+            const keyXml = templateXml.createElement(key);
             keyXml.textContent = server[key];
             serverXml.appendChild(keyXml);
         }
