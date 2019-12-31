@@ -28,4 +28,5 @@ npm i @actions/core
 npm i xmldom
 npm i path
 npm i os
+npm i fs
 ````
