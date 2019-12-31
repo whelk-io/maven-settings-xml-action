@@ -1,4 +1,4 @@
-name: 'Hello World'
+name: 'Update maven ~/.m2/settings.xml'
 description: 'Greet someone and record the time'
 inputs:
   who-to-greet:  # id of input
