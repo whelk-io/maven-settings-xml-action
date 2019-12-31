@@ -5,29 +5,23 @@ const settings = require('./settings');
 //const os = require('os');
 //const path = require('path');
 
-async function run() {
-  try {
-    // `who-to-greet` input defined in action metadata file
-    //const nameToGreet = core.getInput('who-to-greet');
-    //console.log(`Hello ${nameToGreet}!`);
-    ///const time = (new Date()).toTimeString();
-    //core.setOutput("time", time);
-    // Get the JSON webhook payload for the event that triggered the workflow
-    //const payload = JSON.stringify(github.context.payload, undefined, 2)
-    //console.log(`The event payload: ${payload}`);
+try {
+  // `who-to-greet` input defined in action metadata file
+  //const nameToGreet = core.getInput('who-to-greet');
+  //console.log(`Hello ${nameToGreet}!`);
+  ///const time = (new Date()).toTimeString();
+  //core.setOutput("time", time);
+  // Get the JSON webhook payload for the event that triggered the workflow
+  //const payload = JSON.stringify(github.context.payload, undefined, 2)
+  //console.log(`The event payload: ${payload}`);
 
-    /////////
-    //const settingsTemplate = 
-    const templateXml = settings.getSettingsTemplate();
+  /////////
+  //const settingsTemplate = 
+  const templateXml = settings.getSettingsTemplate();
 
-    //const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
-    //settings.writeSettings(settingsPath, templateXml);
+  //const settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
+  //settings.writeSettings(settingsPath, templateXml);
 
-  } catch (error) {
-    core.setFailed(error.message);
-  }
+} catch (error) {
+  core.setFailed(error.message);
 }
-
-run();
-
-module.exports = { run };
