@@ -5,8 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Create maven settings.xml
-      uses: whelk-io/maven-settings-xml-action@v12
+    - name: Create maven settings.xml 13
+      uses: whelk-io/maven-settings-xml-action@v13
       with:
         servers: '[{"id": "github-flesch-kincaid", "username": "zteater", "password": "pass" }]'
         repositories: '[{"id": "github-flesch-kincaid", "url": "https://maven.pkg.github.com/whelk-io/flesch-kincaid"}]'
