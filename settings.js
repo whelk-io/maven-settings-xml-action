@@ -1,11 +1,11 @@
-import { info } from '@actions/core';
+const core = require('@actions/core');
 //const path = require('path');
 //const fs = require('fs');
 //const XMLSerializer = require('xmldom').XMLSerializer;
 //const DOMParser = require('xmldom').DOMParser;
 
 function getSettingsTemplate() {
-    info("opening settings template");
+    core.info("opening settings template");
     //const templatePath = path.join(__dirname, 'template', 'settings.xml');
     //const template = fs.readFileSync(templatePath).toString();
     //return new DOMParser().parseFromString(template, 'text/xml');
@@ -23,6 +23,6 @@ function getSettingsTemplate() {
 //    fs.writeFileSync(settingsPath, settingStr);
 //}
 
-export default {
+module.exports = {
     getSettingsTemplate
 }

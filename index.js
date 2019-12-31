@@ -1,6 +1,6 @@
-import { setFailed } from '@actions/core';
+const core = require('@actions/core');
 //const github = require('@actions/github');
-import settings from './settings';
+const settings = require('./settings').default;
 //const fs = require('fs');
 //const os = require('os');
 //const path = require('path');
@@ -24,10 +24,10 @@ async function run() {
     //settings.writeSettings(settingsPath, templateXml);
 
   } catch (error) {
-    setFailed(error.message);
+    core.setFailed(error.message);
   }
 }
 
 run();
 
-export default { run };
+module.exports = { run };
