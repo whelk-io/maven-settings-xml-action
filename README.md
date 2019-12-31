@@ -1,29 +1,32 @@
-# Hello world javascript action
+# maven-settings-xml-action
 
-This action prints "Hello World" or "Hello" + the name of a person to greet to the log.
+Github Action to update maven ~/.m2/settings.xml
 
 ## Inputs
 
-### `who-to-greet`
+### `servers`
 
-**Required** The name of the person to greet. Default `"World"`.
+**Optional** json array of servers to add to settings.xml.
 
-## Outputs
-
-### `time`
-
-The time we greeted you.
+### `repositories`
+**Optional** json array of repositories to add to settings.xml
 
 ## Example usage
 
-uses: actions/hello-world-javascript-action@v1
+````yaml
+uses: whelk-io/maven-settings-xml-action@v1
 with:
-  who-to-greet: 'Mona the Octocat'
+  repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
+  servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
+````
 
+## Local install
 
+````
 npm i mocha
 npm i @actions/core
 npm i xmldom
 npm i xpath
 npm i path
 npm i os
+````
