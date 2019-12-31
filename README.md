@@ -19,14 +19,3 @@ with:
   repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
   servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
-
-## Local install
-
-````
-npm i mocha
-npm i @actions/core
-npm i xmldom
-npm i path
-npm i os
-npm i fs
-````
