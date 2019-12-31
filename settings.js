@@ -6,7 +6,7 @@ const XMLSerializer = require('xmldom').XMLSerializer;
 
 function getSettingsTemplate() {
     core.info("opening settings template");
-    const templatePath = path.join(__dirname, 'template', 'settings.xml');
+    const templatePath = path.join(__dirname, 'settings.xml');
     const template = fs.readFileSync(templatePath).toString();
     return new DOMParser().parseFromString(template, 'text/xml');
 }
