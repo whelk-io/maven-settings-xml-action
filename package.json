@@ -1,0 +1,24 @@
+{
+  "name": "maven-settings-xml-action",
+  "version": "1.0.0",
+  "description": "This action prints \"Hello World\" or \"Hello\" + the name of a person to greet to the log.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whelk-io/maven-settings-xml-action.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/whelk-io/maven-settings-xml-action/issues"
+  },
+  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme",
+  "dependencies": {
+    "@actions/core": "^1.2.0",
+    "@actions/github": "^2.0.0"
+  }
+}
