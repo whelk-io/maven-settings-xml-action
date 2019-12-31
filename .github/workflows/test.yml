@@ -1,11 +1,13 @@
-on: [push]
+on:
+  push:
+    branches: develop
 
 jobs:
   test_job:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Create maven settings.xml 16
+    - name: Create maven settings.xml
       uses: whelk-io/maven-settings-xml-action@v16
       with:
         servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
