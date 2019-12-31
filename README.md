@@ -19,3 +19,14 @@ The time we greeted you.
 uses: actions/hello-world-javascript-action@v1
 with:
   who-to-greet: 'Mona the Octocat'
+
+-----
+
+
+## NPM Install
+npm i @actions/core
+npm i @actions/github
+npm i os
+npm i fs
+npm i path 
+npm i xmldom
