@@ -7,7 +7,7 @@
     "test": "test"
   },
   "dependencies": {
-    "@actions/core": "^1.2.0",
+    "@actions/core": "^1.2.1",
     "fs": "0.0.1-security",
     "mocha": "^6.2.2",
     "os": "^0.1.1",
