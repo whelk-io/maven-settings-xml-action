@@ -9,7 +9,7 @@
   "dependencies": {
     "@actions/core": "^1.2.2",
     "fs": "0.0.1-security",
-    "mocha": "^6.2.2",
+    "mocha": "^7.0.1",
     "os": "^0.1.1",
     "path": "^0.12.7",
     "xmldom": "^0.2.1"
