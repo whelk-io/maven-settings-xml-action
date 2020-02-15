@@ -65,9 +65,32 @@ function updateRepositories(templateXml) {
     });
 }
 
+function updatePluginRepositories(templateXml) {
+    var pluginRepositoriesInput = core.getInput('plugin_repositories');
+
+    if (!pluginRepositoriesInput) {
+        return;
+    }
+
+    var pluginRepositoriesXml = 
+        templateXml.getElementsByTagName('profiles')[0]
+                   .getElementsByTagName('pluginRepositories')[0];
+
+    JSON.parse(pluginRepositoriesInput).forEach((pluginRepositoryInput) => {
+        var pluginRepositoryXml = templateXml.createElement('pluginRepository');
+        for (var key in pluginRepositoryInput) {
+            var keyXml = templateXml.createElement(key);
+            keyXml.textContent = pluginRepositoryInput[key];
+            pluginRepositoryXml.appendChild(keyXml);
+        }
+        pluginRepositoriesXml.appendChild(pluginRepositoryXml);
+    });
+}
+
 module.exports = {
     getSettingsTemplate,
     writeSettings,
     updateServers,
-    updateRepositories
+    updateRepositories,
+    updatePluginRepositories
 }

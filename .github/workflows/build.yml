@@ -12,6 +12,7 @@ jobs:
       with:
         servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
         repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
+        plugin_repositories: '[{"id": "foo-plugin", "url": "https://fu.bar.plugin"}]'
 
     - run: |
         cat ~/.m2/settings.xml
