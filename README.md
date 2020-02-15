@@ -13,6 +13,9 @@ Github Action to create maven settings (`~/.m2/settings.xml`)
 ### `repositories`
 **Optional** json array of repositories to add to settings.xml
 
+### `plugin_repositories`
+**Optional** json array of plugin repositories to add to settings.xml
+
 ## Example usage
 
 ````yaml
@@ -20,6 +23,7 @@ Github Action to create maven settings (`~/.m2/settings.xml`)
   uses: whelk-io/maven-settings-xml-action@v2
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
+    plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
 
@@ -50,10 +54,16 @@ Github Action to create maven settings (`~/.m2/settings.xml`)
                     </snapshots>
                 </repository>
                 <repository>
-                    <id>foo</id>
-                    <url>http://foo.bar</url>
+                    <id>some-repository</id>
+                    <url>http://some.repository.url</url>
                 </repository>
             </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>some-plugin-repository</id>
+                    <url>http://some.plugin.repository.url</url>
+                </repository>
+            </pluginRepositories>
         </profile>
     </profiles>
   
