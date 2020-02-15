@@ -47,13 +47,13 @@ describe('run settings.js', function () {
 
             // and default settings
             var xml = new DOMParser().parseFromString(
-                "<settings><profiles><profile><id>github</id><repositories/></profile></profiles></settings>");
+                "<settings><profiles><profile><id>github</id><repositories/><pluginRepositories/></profile></profiles></settings>");
 
             // when
             settings.updateRepositories(xml);
 
             // then
-            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><url>http://foo.bar</url></repository></repositories></profile></profiles></settings>';
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><url>http://foo.bar</url></repository></repositories><pluginRepositories/></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
         });
     });
@@ -65,13 +65,31 @@ describe('run settings.js', function () {
 
             // and default settings
             var xml = new DOMParser().parseFromString(
-                "<settings><profiles><profile><id>github</id><repositories/></profile></profiles></settings>");
+                "<settings><profiles><profile><id>github</id><repositories/><pluginRepositories/></profile></profiles></settings>");
 
             // when
             settings.updateRepositories(xml);
 
             // then
-            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><url>http://foo.bar</url></repository></repositories></profile></profiles></settings>';
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><url>http://foo.bar</url></repository></repositories><pluginRepositories/></profile></profiles></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+        });
+    });
+
+    describe('#updatePluginRepositories', function () {
+        it('<pluginRepositories> should be appended with <pluginRepository> when input.pluginRepositories is present', function () {
+            // given input
+            process.env['INPUT_PLUGIN_REPOSITORIES'] = '[{ "id": "foo.plugin", "url": "http://foo.bar.plugin" }]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString(
+                "<settings><profiles><profile><id>github</id><repositories/><pluginRepositories/></profile></profiles></settings>");
+
+            // when
+            settings.updatePluginRepositories(xml);
+
+            // then
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories/><pluginRepositories><pluginRepository><id>foo.plugin</id><url>http://foo.bar.plugin</url></pluginRepository></pluginRepositories></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
         });
     });
