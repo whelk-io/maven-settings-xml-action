@@ -1,6 +1,7 @@
 # maven-settings-xml-action
 
-Github Action to create maven settings (`~/.m2/settings.xml`). Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
+Github Action to create maven settings (`~/.m2/settings.xml`). 
+Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
 
 [![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=whelk-io/maven-settings-xml-action)](https://dependabot.com)
 
