@@ -17,7 +17,7 @@ Github Action to create maven settings (`~/.m2/settings.xml`)
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v2
+  uses: whelk-io/maven-settings-xml-action@v3
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
