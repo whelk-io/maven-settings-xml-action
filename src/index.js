@@ -11,6 +11,7 @@ function run() {
     // update from action input
     settings.updateServers(templateXml);
     settings.updateRepositories(templateXml);
+    settings.updatePluginRepositories(templateXml);
 
     // write template to filepath
     var settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');

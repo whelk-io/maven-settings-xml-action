@@ -22,6 +22,7 @@
           </snapshots>
         </repository>
       </repositories>
+      <pluginRepositories/>
     </profile>
   </profiles>
 
