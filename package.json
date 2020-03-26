@@ -12,7 +12,7 @@
     "mocha": "^7.0.1",
     "os": "^0.1.1",
     "path": "^0.12.7",
-    "xmldom": "^0.2.1"
+    "xmldom": "^0.3.0"
   },
   "devDependencies": {},
   "scripts": {
