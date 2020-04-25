@@ -58,8 +58,21 @@ function updateRepositories(templateXml) {
         var repositoryXml = templateXml.createElement('repository');
         for (var key in repositoryInput) {
             var keyXml = templateXml.createElement(key);
-            keyXml.textContent = repositoryInput[key];
-            repositoryXml.appendChild(keyXml);
+            var child = repositoryInput[key];
+            if (child === Object(child)) {
+                var childXml = templateXml.createElement(key);
+                for (var childKey in child) {
+                    if (Object.prototype.hasOwnProperty.call(child, childKey)) {
+                        var childElement = templateXml.createElement(childKey);
+                        childElement.textContent = child[childKey];
+                        childXml.appendChild(childElement);
+                    }
+                }
+                repositoryXml.appendChild(childXml);
+            } else { 
+                keyXml.textContent = repositoryInput[key];
+                repositoryXml.appendChild(keyXml);
+            }
         }
         repositoriesXml.appendChild(repositoryXml);
     });
@@ -80,8 +93,21 @@ function updatePluginRepositories(templateXml) {
         var pluginRepositoryXml = templateXml.createElement('pluginRepository');
         for (var key in pluginRepositoryInput) {
             var keyXml = templateXml.createElement(key);
-            keyXml.textContent = pluginRepositoryInput[key];
-            pluginRepositoryXml.appendChild(keyXml);
+            var child = pluginRepositoryInput[key];
+            if (child === Object(child)) {
+                var childXml = templateXml.createElement(key);
+                for (var childKey in child) {
+                    if (Object.prototype.hasOwnProperty.call(child, childKey)) {
+                        var childElement = templateXml.createElement(childKey);
+                        childElement.textContent = child[childKey];
+                        childXml.appendChild(childElement);
+                    }
+                }
+                pluginRepositoryXml.appendChild(childXml);
+            } else { 
+                keyXml.textContent = pluginRepositoryInput[key];
+                pluginRepositoryXml.appendChild(keyXml);
+            }
         }
         pluginRepositoriesXml.appendChild(pluginRepositoryXml);
     });
