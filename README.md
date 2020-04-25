@@ -24,8 +24,8 @@ Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
 - name: maven-settings-xml-action
   uses: whelk-io/maven-settings-xml-action@v4
   with:
-    repositories: '[{ "id": "some-repository", "name": "some-repository-name", "url": "http://some.repository.url" }]'
-    plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url" }]'
+    repositories: '[{ "id": "some-repository", "name": "some-repository-name", "url": "http://some.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" } }]'
+    plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" }}]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
 
@@ -59,6 +59,12 @@ Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
                     <id>some-repository</id>
                     <name>some-repository-name</name>
                     <url>http://some.repository.url</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
                 </repository>
             </repositories>
             <pluginRepositories>
@@ -66,6 +72,12 @@ Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
                     <id>some-plugin-repository</id>
                     <name>some-plugin-repository-name</name>
                     <url>http://some.plugin.repository.url</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
                 </repository>
             </pluginRepositories>
         </profile>

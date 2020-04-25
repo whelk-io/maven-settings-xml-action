@@ -61,7 +61,7 @@ describe('run settings.js', function () {
     describe('#updateRepositories', function () {
         it('<repositories> should be appended with <repository> when input.repositories is present', function () {
             // given input
-            process.env['INPUT_REPOSITORIES'] = '[{ "id": "foo", "name": "foo", "url": "http://foo.bar" }]';
+            process.env['INPUT_REPOSITORIES'] = '[{ "id": "foo", "name": "foo", "url": "http://foo.bar", "releases": { "enabled": "true" }, "snapshots": { "enabled": "true" } }]';
 
             // and default settings
             var xml = new DOMParser().parseFromString(
@@ -71,7 +71,7 @@ describe('run settings.js', function () {
             settings.updateRepositories(xml);
 
             // then
-            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><name>foo</name><url>http://foo.bar</url></repository></repositories><pluginRepositories/></profile></profiles></settings>';
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><name>foo</name><url>http://foo.bar</url><releases><enabled>true</enabled></releases><snapshots><enabled>true</enabled></snapshots></repository></repositories><pluginRepositories/></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
         });
     });
@@ -79,7 +79,7 @@ describe('run settings.js', function () {
     describe('#updatePluginRepositories', function () {
         it('<pluginRepositories> should be appended with <pluginRepository> when input.pluginRepositories is present', function () {
             // given input
-            process.env['INPUT_PLUGIN_REPOSITORIES'] = '[{ "id": "foo.plugin", "name": "foo.plugin", "url": "http://foo.bar.plugin" }]';
+            process.env['INPUT_PLUGIN_REPOSITORIES'] = '[{ "id": "foo.plugin", "name": "foo.plugin", "url": "http://foo.bar.plugin", "releases": { "enabled": "true" }, "snapshots": { "enabled": "true" } }]';
 
             // and default settings
             var xml = new DOMParser().parseFromString(
@@ -89,7 +89,7 @@ describe('run settings.js', function () {
             settings.updatePluginRepositories(xml);
 
             // then
-            var expectedXml = '<settings><profiles><profile><id>github</id><repositories/><pluginRepositories><pluginRepository><id>foo.plugin</id><name>foo.plugin</name><url>http://foo.bar.plugin</url></pluginRepository></pluginRepositories></profile></profiles></settings>';
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories/><pluginRepositories><pluginRepository><id>foo.plugin</id><name>foo.plugin</name><url>http://foo.bar.plugin</url><releases><enabled>true</enabled></releases><snapshots><enabled>true</enabled></snapshots></pluginRepository></pluginRepositories></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
         });
     });
