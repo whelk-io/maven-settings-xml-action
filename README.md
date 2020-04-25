@@ -24,8 +24,8 @@ Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
 - name: maven-settings-xml-action
   uses: whelk-io/maven-settings-xml-action@v4
   with:
-    repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
-    plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
+    repositories: '[{ "id": "some-repository", "name": "some-repository-name", "url": "http://some.repository.url" }]'
+    plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url" }]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
 
@@ -57,12 +57,14 @@ Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
                 </repository>
                 <repository>
                     <id>some-repository</id>
+                    <name>some-repository-name</name>
                     <url>http://some.repository.url</url>
                 </repository>
             </repositories>
             <pluginRepositories>
                 <pluginRepository>
                     <id>some-plugin-repository</id>
+                    <name>some-plugin-repository-name</name>
                     <url>http://some.plugin.repository.url</url>
                 </repository>
             </pluginRepositories>
