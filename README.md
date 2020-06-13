@@ -17,6 +17,14 @@ Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
 
 Reference: [Maven Settings > Servers](http://maven.apache.org/settings.html#servers)
 
+### `mirrors`
+
+* **id** - The unique identifier of this mirror. The `id` is used to differentiate between mirror elements and to pick the corresponding credentials from the `<servers>` section when connecting to the mirror.
+* **mirrorOf** - The `id` of the repository that this is a mirror of. For example, to point to a mirror of the Maven central repository (`https://repo.maven.apache.org/maven2/`), set this element to `central`. More advanced mappings like `repo1,repo2` or `*,!inhouse` are also possible. This must not match the mirror `id`.
+* **url** - The base URL of this mirror. The build system will use this URL to connect to a repository rather than the original repository URL.
+
+Reference: [Maven Settings > Mirrors](http://maven.apache.org/settings.html#mirrors)
+
 ### `repositories`
 **Optional** json array of repositories to add to settings.xml
 * **id** - The ID of the repository that matches the id element of the server.
@@ -108,6 +116,8 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
     repositories: '[{ "id": "some-repository", "name": "some-repository-name", "url": "http://some.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" } }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" }}]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
+    mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
+
 ````
 
 ## Full settings.xml
@@ -171,6 +181,14 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
             <password>bar</password>
         </server>
     </servers>
+
+    <mirrors>
+        <mirror>
+            <id>nexus</id>
+            <mirrorOf>!my-org-snapshots,*</mirrorOf>
+            <url>http://redacted/nexus/content/groups/public</url>
+        </mirror>
+    </mirrors>
   
 </settings>
 ````
