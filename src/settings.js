@@ -43,6 +43,27 @@ function updateServers(templateXml) {
 
 }
 
+function updateMirrors(templateXml) {
+    var mirrorsInput = core.getInput('mirrors');
+
+    if (!mirrorsInput) {
+        return;
+    }
+
+    var mirrorsXml = templateXml.getElementsByTagName('mirrors')[0];
+
+    JSON.parse(mirrorsInput).forEach((mirrorInput) => {
+        var mirrorXml = templateXml.createElement('mirror');
+        for (var key in mirrorInput) {
+            var keyXml = templateXml.createElement(key);
+            keyXml.textContent = mirrorInput[key];
+            mirrorXml.appendChild(keyXml);
+        }
+        mirrorsXml.appendChild(mirrorXml);
+    });
+
+}
+
 function updateRepositories(templateXml) {
     var repositoriesInput = core.getInput('repositories');
 
@@ -117,6 +138,7 @@ module.exports = {
     getSettingsTemplate,
     writeSettings,
     updateServers,
+    updateMirrors,
     updateRepositories,
     updatePluginRepositories
 }

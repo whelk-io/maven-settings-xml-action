@@ -11,6 +11,7 @@ jobs:
       uses: whelk-io/maven-settings-xml-action@v1
       with:
         servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
+        mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
         repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
         plugin_repositories: '[{"id": "foo-plugin", "url": "https://fu.bar.plugin"}]'
 

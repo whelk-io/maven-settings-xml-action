@@ -7,6 +7,9 @@ inputs:
   servers:
     description: 'json array of servers to add to settings.xml'
     required: false
+  mirrors:
+    description: 'json array of mirrors to add to settings.xml'
+    required: false
   repositories:
     description: 'json array of repositories to add to settings.xml'
     required: false

@@ -10,6 +10,7 @@ function run() {
 
     // update from action input
     settings.updateServers(templateXml);
+    settings.updateMirrors(templateXml);
     settings.updateRepositories(templateXml);
     settings.updatePluginRepositories(templateXml);
 

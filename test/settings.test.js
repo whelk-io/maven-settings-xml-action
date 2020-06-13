@@ -40,6 +40,23 @@ describe('run settings.js', function () {
         });
     });
 
+    describe('#updateMirrors', function () {
+        it('<mirrors/> should be appended with <mirror> when input.mirror is present', function () {
+            // given input
+            process.env['INPUT_MIRRORS'] = '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString("<settings><mirrors/></settings>");
+
+            // when
+            settings.updateMirrors(xml);
+
+            // then
+            var expectedXml = '<settings><mirrors><mirror><id>nexus</id><mirrorOf>!my-org-snapshots,*</mirrorOf><url>http://redacted/nexus/content/groups/public</url></mirror></mirrors></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+        });
+    });
+
     describe('#updateRepositories', function () {
         it('<repositories> should not be changed when input.repositories is missing', function () {
             // given input
