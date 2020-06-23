@@ -1,4 +1,4 @@
-name: 'maven-settings-xml-action'
+name: 'maven-settings-action'
 description: 'Create maven settings (~/.m2/settings.xml)'
 branding:
   icon: feather
