@@ -16,6 +16,9 @@ inputs:
   plugin_repositories:
     description: 'json array of plugin repositories to add to settings.xml'
     required: false
+  profiles:
+    description: 'json array of profiles to add to settings.xml'
+    required: false
 runs:
   using: 'node12'
   main: 'src/index.js'
