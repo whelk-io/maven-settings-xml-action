@@ -1,20 +1,33 @@
-on:
+name: "build-test"
+
+on: # rebuild any PRs and main branch changes
+  pull_request:
   push:
-    branches: develop
+    branches:
+      - master
+      - 'releases/*'
 
 jobs:
+  build: # make sure build/ci work properly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: |
+          npm install
   test_job:
     runs-on: ubuntu-latest
     steps:
-
-    - name: Create maven settings.xml
-      uses: whelk-io/maven-settings-xml-action@v1
-      with:
-        servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
-        mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
-        repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
-        plugin_repositories: '[{"id": "foo-plugin", "url": "https://fu.bar.plugin"}]'
-
-    - run: |
-        cat ~/.m2/settings.xml
+      - uses: actions/checkout@v1
+      - name: NPM Install
+        run: npm install
+      - name: Create maven settings.xml
+        uses: ./
+        with:
+          servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
+          mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
+          repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
+          plugin_repositories: '[{"id": "foo-plugin", "url": "https://fu.bar.plugin"}]'
+          profiles: '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]'
+      - run: |
+          cat ~/.m2/settings.xml
 

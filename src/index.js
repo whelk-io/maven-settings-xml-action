@@ -13,6 +13,7 @@ function run() {
     settings.updateMirrors(templateXml);
     settings.updateRepositories(templateXml);
     settings.updatePluginRepositories(templateXml);
+    settings.updateProfiles(templateXml)
 
     // write template to filepath
     var settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
