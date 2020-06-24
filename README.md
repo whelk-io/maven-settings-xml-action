@@ -4,7 +4,7 @@
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
-Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<mirrors>`, and `<profiles>`,  .
+Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<mirrors>`, and `<profiles>`.
 
 ## Inputs
 
