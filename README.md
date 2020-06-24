@@ -1,6 +1,6 @@
 # maven-settings-xml-action
 
-[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) 
+[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) ![build-test](https://github.com/whelk-io/maven-settings-xml-action/workflows/build-test/badge.svg)
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
