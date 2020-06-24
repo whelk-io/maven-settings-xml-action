@@ -33,5 +33,6 @@
   "bugs": {
     "url": "https://github.com/whelk-io/maven-settings-xml-action/issues"
   },
-  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme"
+  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme",
+  "contributors": [{"name":"Jason Edstrom", "email": "jason@instacode.io"}]
 }
