@@ -2,20 +2,25 @@
   "name": "maven-settings-xml-action",
   "version": "0.0.2",
   "description": "Update maven ~/.m2/settings.xml",
-  "main": "index.js",
+  "main": "./src/index.js",
   "directories": {
     "test": "test"
   },
   "dependencies": {
     "@actions/core": "^1.2.4",
     "fs": "0.0.1-security",
-    "mocha": "^8.0.1",
     "os": "^0.1.1",
     "path": "^0.12.7",
     "xmldom": "^0.3.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@zeit/ncc": "^0.20.5",
+    "eslint": "^6.3.0",
+    "mocha": "^8.0.1"
+  },
   "scripts": {
+    "lint": "eslint ./src/*.js",
+    "package": "ncc build ./src/index.js -o dist",
     "test": "mocha"
   },
   "repository": {
