@@ -20,7 +20,7 @@
   },
   "scripts": {
     "lint": "eslint ./src/*.js",
-    "package": "ncc build ./src/index.js -o dist",
+    "package": "ncc build ./src -o dist",
     "test": "mocha"
   },
   "repository": {
