@@ -111,5 +111,23 @@ describe('run settings.js', function () {
         });
     });
 
+    describe('#updateProfiles', function () {
+        it('<profiles> should be appended with <profile> when input.profiles is present', function () {
+            // given input
+            process.env['INPUT_PROFILES'] = '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString(
+                "<settings><profiles><profile><id>github</id><repositories/></profile></profiles></settings>");
+
+            // when
+            settings.updateProfiles(xml);
+
+            // then
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories/></profile><profile><id>foo.profile</id><name>foo.profile</name><url>http://foo.bar.profile</url><properties><foo>property-1</foo><bar>property-2</bar></properties></profile></profiles></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+        });
+    });
+
 });
 

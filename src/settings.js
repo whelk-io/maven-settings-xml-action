@@ -134,11 +134,46 @@ function updatePluginRepositories(templateXml) {
     });
 }
 
+function updateProfiles(templateXml) {
+    var profilesInput = core.getInput('profiles');
+
+    if (!profilesInput) {
+        return;
+    }
+
+    var profilesXml =
+        templateXml.getElementsByTagName('profiles')[0];
+
+    JSON.parse(profilesInput).forEach((profileInput) => {
+        var profileXml = templateXml.createElement('profile');
+        for (var key in profileInput) {
+            var keyXml = templateXml.createElement(key);
+            var child = profileInput[key];
+            if (child === Object(child)) {
+                var childXml = templateXml.createElement(key);
+                for (var childKey in child) {
+                    if (Object.prototype.hasOwnProperty.call(child, childKey)) {
+                        var childElement = templateXml.createElement(childKey);
+                        childElement.textContent = child[childKey];
+                        childXml.appendChild(childElement);
+                    }
+                }
+                profileXml.appendChild(childXml);
+            } else {
+                keyXml.textContent = profileInput[key];
+                profileXml.appendChild(keyXml);
+            }
+        }
+        profilesXml.appendChild(profileXml);
+    });
+}
+
 module.exports = {
     getSettingsTemplate,
     writeSettings,
     updateServers,
     updateMirrors,
     updateRepositories,
-    updatePluginRepositories
+    updatePluginRepositories,
+    updateProfiles
 }
