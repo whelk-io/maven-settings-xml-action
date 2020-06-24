@@ -21,7 +21,7 @@
   },
   "scripts": {
     "lint": "eslint ./src/*.js",
-    "package": "ncc build ./src -o dist",
+    "package": "ncc build",
     "test": "mocha"
   },
   "repository": {
