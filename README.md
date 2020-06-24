@@ -1,10 +1,10 @@
 # maven-settings-xml-action
 
-[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) [![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=whelk-io/maven-settings-xml-action)](https://dependabot.com)
+[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) 
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
-Supports `<servers>`, `<repositories>`, and `<pluginRepositories>`.
+Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<mirrors>`, and `<profiles>`,  .
 
 ## Inputs
 
@@ -44,6 +44,13 @@ Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settin
 * **snapshots.enabled** - Enable snapshot policy.
 
 Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html#Plugin_Repositories)
+
+### `profiles`
+**Optional** json array of profiles to add to settings.xml
+
+The `profile` element in the `settings.xml` is a truncated version of the `pom.xml` `profile` element. It consists of the `activation`, `repositories`, `pluginRepositories` and `properties` elements. The `profile` elements only include these four elements because they concerns themselves with the build system as a whole (which is the role of the `settings.xml` file), not about individual project object model settings.
+
+Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
 
 ## Simple Usage
 
@@ -91,7 +98,7 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
                 <pluginRepository>
                     <id>some-plugin-repository</id>
                     <url>http://some.plugin.repository.url</url>
-                </repository>
+                </pluginRepository>
             </pluginRepositories>
         </profile>
     </profiles>
@@ -117,6 +124,7 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
     plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" }}]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
     mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
+    profiles: '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]'
 
 ````
 
@@ -169,8 +177,17 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
                     <snapshots>
                         <enabled>false</enabled>
                     </snapshots>
-                </repository>
+                </pluginRepository>
             </pluginRepositories>
+        </profile>
+        <profile>
+            <id>foo.profile</id>
+            <name>foo.profile</name>
+            <url>http://foo.bar.profile</url>
+            <properties>
+                <foo>property-1</foo>
+                <bar>property-2</bar>
+            </properties>
         </profile>
     </profiles>
   
@@ -181,7 +198,7 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
             <password>bar</password>
         </server>
     </servers>
-
+  
     <mirrors>
         <mirror>
             <id>nexus</id>
