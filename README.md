@@ -45,6 +45,13 @@ Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settin
 
 Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html#Plugin_Repositories)
 
+### `profiles`
+**Optional** json array of profiles to add to settings.xml
+
+The `profile` element in the `settings.xml` is a truncated version of the `pom.xml` `profile` element. It consists of the `activation`, `repositories`, `pluginRepositories` and `properties` elements. The `profile` elements only include these four elements because they concerns themselves with the build system as a whole (which is the role of the `settings.xml` file), not about individual project object model settings.
+
+Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
+
 ## Simple Usage
 
 ````yaml
