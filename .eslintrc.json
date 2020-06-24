@@ -1,4 +1,5 @@
 {
+    "plugins": ["mocha"],
     "env": {
         "commonjs": true,
         "es6": true,
