@@ -2,20 +2,27 @@
   "name": "maven-settings-xml-action",
   "version": "0.0.2",
   "description": "Update maven ~/.m2/settings.xml",
-  "main": "index.js",
+  "main": "src/index.js",
   "directories": {
     "test": "test"
   },
   "dependencies": {
     "@actions/core": "^1.2.4",
     "fs": "0.0.1-security",
-    "mocha": "^8.0.1",
     "os": "^0.1.1",
     "path": "^0.12.7",
     "xmldom": "^0.3.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@zeit/ncc": "^0.20.5",
+    "eslint": "^7.3.0",
+    "eslint-plugin-mocha": "^7.0.1",
+    "mocha": "^8.0.1",
+    "mocha-eslint": "^6.0.0"
+  },
   "scripts": {
+    "lint": "eslint ./src/*.js",
+    "package": "ncc build",
     "test": "mocha"
   },
   "repository": {
@@ -27,5 +34,11 @@
   "bugs": {
     "url": "https://github.com/whelk-io/maven-settings-xml-action/issues"
   },
-  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme"
+  "homepage": "https://github.com/whelk-io/maven-settings-xml-action#readme",
+  "contributors": [
+    {
+      "name": "Jason Edstrom",
+      "email": "jason@instacode.io"
+    }
+  ]
 }
