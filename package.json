@@ -1,6 +1,6 @@
 {
   "name": "maven-settings-xml-action",
-  "version": "0.0.2",
+  "version": "0.0.8",
   "description": "Update maven ~/.m2/settings.xml",
   "main": "src/index.js",
   "directories": {
@@ -22,14 +22,17 @@
   },
   "scripts": {
     "lint": "eslint ./src/*.js",
-    "package": "ncc build",
+    "prepare": "ncc build src/index.js -o dist",
     "test": "mocha"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/whelk-io/maven-settings-xml-action.git"
+    "url": "https://github.com/whelk-io/maven-settings-xml-action.git"
   },
-  "author": "Zack Teater",
+  "author": {
+    "name": "Zack Teater",
+    "url": "http://whelk.io"
+  },
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/whelk-io/maven-settings-xml-action/issues"
