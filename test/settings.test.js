@@ -20,6 +20,8 @@ describe('run settings.js', function () {
             // then
             var expectedXml = '<settings><servers/></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_SERVERS'] = '';
         });
     });
 
@@ -37,6 +39,8 @@ describe('run settings.js', function () {
             // then
             var expectedXml = '<settings><servers><server><id>foo</id><username>fu</username><password>bar</password></server></servers></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_SERVERS'] = '';
         });
     });
 
@@ -54,10 +58,12 @@ describe('run settings.js', function () {
             // then
             var expectedXml = '<settings><mirrors><mirror><id>nexus</id><mirrorOf>!my-org-snapshots,*</mirrorOf><url>http://redacted/nexus/content/groups/public</url></mirror></mirrors></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_MIRRORS'] = '';
         });
     });
 
-    describe('#updateRepositories', function () {
+    describe('#doNotUpdateRepositories', function () {
         it('<repositories> should not be changed when input.repositories is missing', function () {
             // given input
             process.env['INPUT_REPOSITORIES'] = '[{ "id": "foo", "url": "http://foo.bar" }]';
@@ -72,6 +78,8 @@ describe('run settings.js', function () {
             // then
             var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><url>http://foo.bar</url></repository></repositories><pluginRepositories/></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_REPOSITORIES'] = '';
         });
     });
 
@@ -90,6 +98,8 @@ describe('run settings.js', function () {
             // then
             var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>foo</id><name>foo</name><url>http://foo.bar</url><releases><enabled>true</enabled></releases><snapshots><enabled>true</enabled></snapshots></repository></repositories><pluginRepositories/></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_REPOSITORIES'] = '';
         });
     });
 
@@ -108,6 +118,8 @@ describe('run settings.js', function () {
             // then
             var expectedXml = '<settings><profiles><profile><id>github</id><repositories/><pluginRepositories><pluginRepository><id>foo.plugin</id><name>foo.plugin</name><url>http://foo.bar.plugin</url><releases><enabled>true</enabled></releases><snapshots><enabled>true</enabled></snapshots></pluginRepository></pluginRepositories></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_PLUGIN_REPOSITORIES'] = '';
         });
     });
 
@@ -125,6 +137,26 @@ describe('run settings.js', function () {
 
             // then
             var expectedXml = '<settings><profiles><profile><id>github</id><repositories/></profile><profile><id>foo.profile</id><name>foo.profile</name><url>http://foo.bar.profile</url><properties><foo>property-1</foo><bar>property-2</bar></properties></profile></profiles></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_PROFILES'] = '';
+        });
+    });
+
+    describe('#updateRepositoriesWithSnapshots', function () {
+        it('<repositories> should build with snapshots, when provided', function () {
+            // given input
+            process.env['INPUT_REPOSITORIES'] = '[{ "id": "maven-internal", "url": "https://maven.aaaaa.aa", "name": "maven-internal", "snapshots": {"enabled": "true"} }]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString(
+                "<settings><profiles><profile><id>github</id><repositories/></profile></profiles></settings>");
+
+            // when
+            settings.updateRepositories(xml);
+
+            // then
+            var expectedXml = '<settings><profiles><profile><id>github</id><repositories><repository><id>maven-internal</id><url>https://maven.aaaaa.aa</url><name>maven-internal</name><snapshots><enabled>true</enabled></snapshots></repository></repositories></profile></profiles></settings>';
             assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
         });
     });
