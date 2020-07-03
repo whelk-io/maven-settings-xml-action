@@ -56,7 +56,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v4
+  uses: whelk-io/maven-settings-xml-action@v9
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
@@ -118,7 +118,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v4
+  uses: whelk-io/maven-settings-xml-action@v9
   with:
     repositories: '[{ "id": "some-repository", "name": "some-repository-name", "url": "http://some.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" } }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" }}]'
