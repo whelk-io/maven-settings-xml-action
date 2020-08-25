@@ -1,5 +1,5 @@
-name: 'maven-settings-xml-action'
-description: 'Create maven settings (~/.m2/settings.xml)'
+name: 'Generate settings.xml for Maven Builds'
+description: 'Create and customize ~/.m2/settings.xml'
 branding:
   icon: feather
   color: orange
