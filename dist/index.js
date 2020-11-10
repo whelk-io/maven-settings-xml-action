@@ -3091,7 +3091,7 @@ module.exports = {
     updateRepositories,
     updatePluginRepositories,
     updateProfiles,
-	updatePluginGroups
+    updatePluginGroups
 }
 
 /***/ })
