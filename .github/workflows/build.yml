@@ -27,6 +27,7 @@ jobs:
           repositories: '[{"id": "foo", "url": "https://fu.bar"}]'
           plugin_repositories: '[{"id": "foo-plugin", "url": "https://fu.bar.plugin"}]'
           profiles: '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]'
+          plugin_groups: '[ "some.plugin.group.id", "some.other.plugin.group.id" ]'
       - run: |
           cat ~/.m2/settings.xml
 

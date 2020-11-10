@@ -19,6 +19,9 @@ inputs:
   profiles:
     description: 'json array of profiles to add to settings.xml'
     required: false
+  plugin_groups:
+    description: 'json array of plugin groups to add to settings.xml'
+    required: false
 runs:
   using: 'node12'
   main: 'dist/index.js'

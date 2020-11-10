@@ -45,6 +45,11 @@ Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settin
 
 Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html#Plugin_Repositories)
 
+### `plugin_groups`
+**Optional** json array of plugin groups to add to settings.xml
+
+Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#Plugin_Groups)
+
 ### `profiles`
 **Optional** json array of profiles to add to settings.xml
 
@@ -125,6 +130,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
     mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
     profiles: '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]'
+	plugin_groups: '[ "some.plugin.group.id", "some.other.plugin.group.id" ]'
 
 ````
 
@@ -206,6 +212,11 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
             <url>http://redacted/nexus/content/groups/public</url>
         </mirror>
     </mirrors>
+  
+    <pluginGroups>
+        <pluginGroup>some.plugin.group.id</pluginGroup>
+        <pluginGroup>some.other.plugin.group.id</pluginGroup>
+    </pluginGroups>
   
 </settings>
 ````
