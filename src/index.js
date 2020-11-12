@@ -14,6 +14,7 @@ function run() {
     settings.updateRepositories(templateXml);
     settings.updatePluginRepositories(templateXml);
     settings.updateProfiles(templateXml)
+    settings.updatePluginGroups(templateXml)
 
     // write template to filepath
     var settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');

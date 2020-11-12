@@ -161,5 +161,24 @@ describe('run settings.js', function () {
         });
     });
 
+    describe('#updatePluginGroups', function () {
+        it('<pluginGroups/> should be appended with <pluginGroup> when input.pluginGroups is present', function () {
+            // given input
+            process.env['INPUT_PLUGIN_GROUPS'] = '[ "some.plugin.group.id" ]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString("<settings><pluginGroups/></settings>");
+
+            // when
+            settings.updatePluginGroups(xml);
+
+            // then
+            var expectedXml = '<settings><pluginGroups><pluginGroup>some.plugin.group.id</pluginGroup></pluginGroups></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_PLUGIN_GROUPS'] = '';
+        });
+    });
+
 });
 
