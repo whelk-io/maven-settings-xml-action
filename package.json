@@ -17,7 +17,7 @@
     "@zeit/ncc": "^0.20.5",
     "eslint": "^7.3.0",
     "eslint-plugin-mocha": "^7.0.1",
-    "mocha": "^8.0.1",
+    "mocha": "^8.2.1",
     "mocha-eslint": "^6.0.0"
   },
   "scripts": {
