@@ -201,13 +201,6 @@ function escapeProperty(s) {
 /***/ 440:
 /***/ (function(__unusedmodule, exports) {
 
-/*
- * DOM Level 2
- * Object DOMException
- * @see http://www.w3.org/TR/REC-DOM-Level-1/ecma-script-language-binding.html
- * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/ecma-script-binding.html
- */
-
 function copy(src,dest){
 	for(var p in src){
 		dest[p] = src[p];
@@ -269,7 +262,12 @@ var INVALID_MODIFICATION_ERR 	= ExceptionCode.INVALID_MODIFICATION_ERR 	= ((Exce
 var NAMESPACE_ERR            	= ExceptionCode.NAMESPACE_ERR           	= ((ExceptionMessage[14]="Invalid namespace"),14);
 var INVALID_ACCESS_ERR       	= ExceptionCode.INVALID_ACCESS_ERR      	= ((ExceptionMessage[15]="Invalid access"),15);
 
-
+/**
+ * DOM Level 2
+ * Object DOMException
+ * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/ecma-script-binding.html
+ * @see http://www.w3.org/TR/REC-DOM-Level-1/ecma-script-language-binding.html
+ */
 function DOMException(code, message) {
 	if(message instanceof Error){
 		var error = message;
@@ -812,10 +810,10 @@ Document.prototype = {
 	},
 	
 	getElementsByClassName: function(className) {
-		const pattern = new RegExp(`(^|\\s)${className}(\\s|$)`);
-		return new LiveNodeList(this, base => {
+		var pattern = new RegExp("(^|\\s)" + className + "(\\s|$)");
+		return new LiveNodeList(this, function(base) {
 			var ls = [];
-			_visitNode(base.documentElement, node => {
+			_visitNode(base.documentElement, function(node) {
 				if(node !== base && node.nodeType == ELEMENT_NODE) {
 					if(pattern.test(node.getAttribute('class'))) {
 						ls.push(node);
@@ -1269,9 +1267,27 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 		}
 		return;
 	case ATTRIBUTE_NODE:
-		return buf.push(' ',node.name,'="',node.value.replace(/[<&"]/g,_xmlEncoder),'"');
+		return buf.push(' ',node.name,'="',node.value.replace(/[&"]/g,_xmlEncoder),'"');
 	case TEXT_NODE:
-		return buf.push(node.data.replace(/[<&]/g,_xmlEncoder));
+		/**
+		 * The ampersand character (&) and the left angle bracket (<) must not appear in their literal form,
+		 * except when used as markup delimiters, or within a comment, a processing instruction, or a CDATA section.
+		 * If they are needed elsewhere, they must be escaped using either numeric character references or the strings
+		 * `&amp;` and `&lt;` respectively.
+		 * The right angle bracket (>) may be represented using the string " &gt; ", and must, for compatibility,
+		 * be escaped using either `&gt;` or a character reference when it appears in the string `]]>` in content,
+		 * when that string is not marking the end of a CDATA section.
+		 *
+		 * In the content of elements, character data is any string of characters
+		 * which does not contain the start-delimiter of any markup
+		 * and does not include the CDATA-section-close delimiter, `]]>`.
+		 *
+		 * @see https://www.w3.org/TR/xml/#NT-CharData
+		 */
+		return buf.push(node.data
+			.replace(/[<&]/g,_xmlEncoder)
+			.replace(/]]>/g, ']]&gt;')
+		);
 	case CDATA_SECTION_NODE:
 		return buf.push( '<![CDATA[',node.data,']]>');
 	case COMMENT_NODE:
@@ -1281,13 +1297,13 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 		var sysid = node.systemId;
 		buf.push('<!DOCTYPE ',node.name);
 		if(pubid){
-			buf.push(' PUBLIC "',pubid);
+			buf.push(' PUBLIC ', pubid);
 			if (sysid && sysid!='.') {
-				buf.push( '" "',sysid);
+				buf.push(' ', sysid);
 			}
-			buf.push('">');
+			buf.push('>');
 		}else if(sysid && sysid!='.'){
-			buf.push(' SYSTEM "',sysid,'">');
+			buf.push(' SYSTEM ', sysid, '>');
 		}else{
 			var sub = node.internalSubset;
 			if(sub){
@@ -1454,6 +1470,7 @@ try{
 
 //if(typeof require == 'function'){
 	exports.Node = Node;
+	exports.DOMException = DOMException;
 	exports.DOMImplementation = DOMImplementation;
 	exports.XMLSerializer = XMLSerializer;
 //}
@@ -1729,6 +1746,21 @@ var S_ATTR_END = 5;//attr value end and no space(quot end)
 var S_TAG_SPACE = 6;//(attr value end || tag end ) && (space offer)
 var S_TAG_CLOSE = 7;//closed el<el />
 
+/**
+ * Creates an error that will not be caught by XMLReader aka the SAX parser.
+ *
+ * @param {string} message
+ * @param {any?} locator Optional, can provide details about the location in the source
+ * @constructor
+ */
+function ParseError(message, locator) {
+	this.message = message
+	this.locator = locator
+	if(Error.captureStackTrace) Error.captureStackTrace(this, ParseError);
+}
+ParseError.prototype = new Error();
+ParseError.prototype.name = ParseError.name
+
 function XMLReader(){
 	
 }
@@ -1837,7 +1869,7 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 						}
 					}
 					if(!endMatch){
-		            	errorHandler.fatalError("end tag name: "+tagName+' is not match the current start tagName:'+config.tagName );
+		            	errorHandler.fatalError("end tag name: "+tagName+' is not match the current start tagName:'+config.tagName ); // No known test case
 					}
 		        }else{
 		        	parseStack.push(config)
@@ -1898,10 +1930,11 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 				}
 			}
 		}catch(e){
+			if (e instanceof ParseError) {
+				throw e;
+			}
 			errorHandler.error('element parse error: '+e)
-			//errorHandler.error('element parse error: '+e);
 			end = -1;
-			//throw e;
 		}
 		if(end>start){
 			start = end;
@@ -1922,6 +1955,16 @@ function copyLocator(f,t){
  * @return end of the elementStartPart(end of elementEndPart for selfClosed el)
  */
 function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,errorHandler){
+
+	/**
+	 * @param {string} qname
+	 * @param {string} value
+	 * @param {number} startIndex
+	 */
+	function addAttribute(qname, value, startIndex) {
+		if (qname in el.attributeNames) errorHandler.fatalError('Attribute ' + qname + ' redefined')
+		el.addValue(qname, value, startIndex)
+	}
 	var attrName;
 	var value;
 	var p = ++start;
@@ -1937,7 +1980,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 				s = S_EQ;
 			}else{
 				//fatalError: equal must after attrName or space after attrName
-				throw new Error('attribute equal must after attrName');
+				throw new Error('attribute equal must after attrName'); // No known test case
 			}
 			break;
 		case '\'':
@@ -1952,7 +1995,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 				p = source.indexOf(c,start)
 				if(p>0){
 					value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
-					el.add(attrName,value,start-1);
+					addAttribute(attrName, value, start-1);
 					s = S_ATTR_END;
 				}else{
 					//fatalError: no end quot match
@@ -1961,14 +2004,14 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 			}else if(s == S_ATTR_NOQUOT_VALUE){
 				value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
 				//console.log(attrName,value,start,p)
-				el.add(attrName,value,start);
+				addAttribute(attrName, value, start);
 				//console.dir(el)
 				errorHandler.warning('attribute "'+attrName+'" missed start quot('+c+')!!');
 				start = p+1;
 				s = S_ATTR_END
 			}else{
 				//fatalError: no equal before
-				throw new Error('attribute value must after "="');
+				throw new Error('attribute value must after "="'); // No known test case
 			}
 			break;
 		case '/':
@@ -1986,11 +2029,10 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 				break;
 			//case S_EQ:
 			default:
-				throw new Error("attribute invalid close char('/')")
+				throw new Error("attribute invalid close char('/')") // No known test case
 			}
 			break;
 		case ''://end document
-			//throw new Error('unexpected end of input')
 			errorHandler.error('unexpected end of input');
 			if(s == S_TAG){
 				el.setTagName(source.slice(start,p));
@@ -2016,13 +2058,13 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 					value = attrName;
 				}
 				if(s == S_ATTR_NOQUOT_VALUE){
-					errorHandler.warning('attribute "'+value+'" missed quot(")!!');
-					el.add(attrName,value.replace(/&#?\w+;/g,entityReplacer),start)
+					errorHandler.warning('attribute "'+value+'" missed quot(")!');
+					addAttribute(attrName, value.replace(/&#?\w+;/g,entityReplacer), start)
 				}else{
 					if(currentNSMap[''] !== 'http://www.w3.org/1999/xhtml' || !value.match(/^(?:disabled|checked|selected)$/i)){
 						errorHandler.warning('attribute "'+value+'" missed value!! "'+value+'" instead!!')
 					}
-					el.add(value,value,start)
+					addAttribute(value, value, start)
 				}
 				break;
 			case S_EQ:
@@ -2047,7 +2089,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 				case S_ATTR_NOQUOT_VALUE:
 					var value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
 					errorHandler.warning('attribute "'+value+'" missed quot(")!!');
-					el.add(attrName,value,start)
+					addAttribute(attrName, value, start)
 				case S_ATTR_END:
 					s = S_TAG_SPACE;
 					break;
@@ -2070,7 +2112,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 					if(currentNSMap[''] !== 'http://www.w3.org/1999/xhtml' || !attrName.match(/^(?:disabled|checked|selected)$/i)){
 						errorHandler.warning('attribute "'+attrName+'" missed value!! "'+attrName+'" instead2!!')
 					}
-					el.add(attrName,attrName,start);
+					addAttribute(attrName, attrName, start);
 					start = p;
 					s = S_ATTR;
 					break;
@@ -2242,11 +2284,18 @@ function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
 		var len = matchs.length;
 		if(len>1 && /!doctype/i.test(matchs[0][0])){
 			var name = matchs[1][0];
-			var pubid = len>3 && /^public$/i.test(matchs[2][0]) && matchs[3][0]
-			var sysid = len>4 && matchs[4][0];
+			var pubid = false;
+			var sysid = false;
+			if(len>3){
+				if(/^public$/i.test(matchs[2][0])){
+					pubid = matchs[3][0];
+					sysid = len>4 && matchs[4][0];
+				}else if(/^system$/i.test(matchs[2][0])){
+					sysid = matchs[3][0];
+				}
+			}
 			var lastMatch = matchs[len-1]
-			domBuilder.startDTD(name,pubid && pubid.replace(/^(['"])(.*?)\1$/,'$2'),
-					sysid && sysid.replace(/^(['"])(.*?)\1$/,'$2'));
+			domBuilder.startDTD(name, pubid, sysid);
 			domBuilder.endDTD();
 			
 			return lastMatch.index+lastMatch[0].length
@@ -2272,11 +2321,8 @@ function parseInstruction(source,start,domBuilder){
 	return -1;
 }
 
-/**
- * @param source
- */
-function ElementAttributes(source){
-	
+function ElementAttributes(){
+	this.attributeNames = {}
 }
 ElementAttributes.prototype = {
 	setTagName:function(tagName){
@@ -2285,10 +2331,11 @@ ElementAttributes.prototype = {
 		}
 		this.tagName = tagName
 	},
-	add:function(qName,value,offset){
+	addValue:function(qName, value, offset) {
 		if(!tagNamePattern.test(qName)){
 			throw new Error('invalid attribute:'+qName)
 		}
+		this.attributeNames[qName] = this.length;
 		this[this.length++] = {qName:qName,value:value,offset:offset}
 	},
 	length:0,
@@ -2324,7 +2371,7 @@ function split(source,start){
 }
 
 exports.XMLReader = XMLReader;
-
+exports.ParseError = ParseError;
 
 
 /***/ }),
@@ -2400,7 +2447,7 @@ DOMParser.prototype.parseFromString = function(source,mimeType){
 		defaultNSMap['']= 'http://www.w3.org/1999/xhtml';
 	}
 	defaultNSMap.xml = defaultNSMap.xml || 'http://www.w3.org/XML/1998/namespace';
-	if(source){
+	if(source && typeof source === 'string'){
 		sax.parse(source,defaultNSMap,entityMap);
 	}else{
 		sax.errorHandler.error("invalid doc source");
@@ -2557,8 +2604,7 @@ DOMHandler.prototype = {
 		console.error('[xmldom error]\t'+error,_locator(this.locator));
 	},
 	fatalError:function(error) {
-		console.error('[xmldom fatalError]\t'+error,_locator(this.locator));
-	    throw error;
+		throw new ParseError(error, this.locator);
 	}
 }
 function _locator(l){
@@ -2623,10 +2669,13 @@ function appendElement (hander,node) {
 
 //if(typeof require == 'function'){
 var htmlEntity = __webpack_require__(740);
-var XMLReader = __webpack_require__(503).XMLReader;
+var sax = __webpack_require__(503);
+var XMLReader = sax.XMLReader;
+var ParseError = sax.ParseError;
 var DOMImplementation = exports.DOMImplementation = __webpack_require__(440).DOMImplementation;
 exports.XMLSerializer = __webpack_require__(440).XMLSerializer ;
 exports.DOMParser = DOMParser;
+exports.__DOMHandler = DOMHandler;
 //}
 
 
@@ -2646,9 +2695,7 @@ exports.entityMap = {
        Acirc: "Â",
        Atilde: "Ã",
        Auml: "Ä",
-       auml: "ä",
        Aring: "Å",
-       aring: "å",
        AElig: "Æ",
        Ccedil: "Ç",
        Egrave: "È",
@@ -2666,7 +2713,6 @@ exports.entityMap = {
        Ocirc: "Ô",
        Otilde: "Õ",
        Ouml: "Ö",
-       ouml: "ö",
        Oslash: "Ø",
        Ugrave: "Ù",
        Uacute: "Ú",
@@ -2706,7 +2752,7 @@ exports.entityMap = {
        yacute: "ý",
        thorn: "þ",
        yuml: "ÿ",
-       nbsp: " ",
+       nbsp: "\u00a0",
        iexcl: "¡",
        cent: "¢",
        pound: "£",
@@ -2881,7 +2927,6 @@ exports.entityMap = {
        hearts: "♥",
        diams: "♦"
 };
-//for(var  n in exports.entityMap){console.log(exports.entityMap[n].charCodeAt())}
 
 
 /***/ }),
