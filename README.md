@@ -63,7 +63,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v14
+  uses: whelk-io/maven-settings-xml-action@v16
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
@@ -125,7 +125,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v14
+  uses: whelk-io/maven-settings-xml-action@v16
   with:
     repositories: |
       [
