@@ -156,20 +156,20 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
         }
       ]
     servers: |
-    [
-      {
-        "id": "some-id",
-        "username": "${env.USER}",
-        "password": "${env.PASS}",
-        "configuration": {
-          "httpConfiguration": {
-            "all": {
-              "usePreemptive": "true"
+      [
+        {
+          "id": "some-id",
+          "username": "${env.USER}",
+          "password": "${env.PASS}",
+          "configuration": {
+            "httpConfiguration": {
+              "all": {
+                "usePreemptive": "true"
+              }
             }
           }
         }
-      }
-    ]
+      ]
     mirrors: |
       [
         {
