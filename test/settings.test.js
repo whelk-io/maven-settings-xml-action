@@ -44,6 +44,44 @@ describe('run settings.js', function () {
         });
     });
 
+    describe('#updateServers', function () {
+        it('<server/> should be appended with <server><configuration> when extended configuration is provided', function () {
+            // given input
+            process.env['INPUT_SERVERS'] = '[{ "id": "foo", "username": "fu", "password": "bar", "configuration": { "httpConfiguration": { "all" : { "usePreemptive": "true" }}}}]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString("<settings><servers/></settings>");
+
+            // when
+            settings.updateServers(xml);
+
+            // then
+            var expectedXml = '<settings><servers><server><id>foo</id><username>fu</username><password>bar</password><configuration><httpConfiguration><all><usePreemptive>true</usePreemptive></all></httpConfiguration></configuration></server></servers></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_SERVERS'] = '';
+        });
+    });
+
+    describe('#updateServers', function () {
+        it('<server/> should be appended with <server> and include all maven server properties', function () {
+            // given input
+            process.env['INPUT_SERVERS'] = '[{ "id": "foo", "username": "fu", "password": "bar", "privateKey": "${user.home}/.ssh/id_dsa", "passphrase": "some_passphrase", "filePermissions": "664", "directoryPermissions": "775" }]';
+
+            // and default settings
+            var xml = new DOMParser().parseFromString("<settings><servers/></settings>");
+
+            // when
+            settings.updateServers(xml);
+
+            // then
+            var expectedXml = '<settings><servers><server><id>foo</id><username>fu</username><password>bar</password><privateKey>${user.home}/.ssh/id_dsa</privateKey><passphrase>some_passphrase</passphrase><filePermissions>664</filePermissions><directoryPermissions>775</directoryPermissions></server></servers></settings>';
+            assert.equal(new XMLSerializer().serializeToString(xml), expectedXml);
+
+            process.env['INPUT_SERVERS'] = '';
+        });
+    });
+
     describe('#updateMirrors', function () {
         it('<mirrors/> should be appended with <mirror> when input.mirror is present', function () {
             // given input

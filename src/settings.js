@@ -35,7 +35,13 @@ function updateServers(templateXml) {
         var serverXml = templateXml.createElement('server');
         for (var key in serverInput) {
             var keyXml = templateXml.createElement(key);
-            keyXml.textContent = serverInput[key];
+
+            // convert all json content as xml
+            var value = objectToXml(serverInput[key]);
+            var xmlValue = new DOMParser().parseFromString(value, 'text/xml');
+
+            // append new xml to current node
+            keyXml.appendChild(xmlValue);
             serverXml.appendChild(keyXml);
         }
         serversXml.appendChild(serverXml);
@@ -71,9 +77,9 @@ function updateRepositories(templateXml) {
         return;
     }
 
-    var repositoriesXml = 
+    var repositoriesXml =
         templateXml.getElementsByTagName('profiles')[0]
-                   .getElementsByTagName('repositories')[0];
+            .getElementsByTagName('repositories')[0];
 
     JSON.parse(repositoriesInput).forEach((repositoryInput) => {
         var repositoryXml = templateXml.createElement('repository');
@@ -90,7 +96,7 @@ function updateRepositories(templateXml) {
                     }
                 }
                 repositoryXml.appendChild(childXml);
-            } else { 
+            } else {
                 keyXml.textContent = repositoryInput[key];
                 repositoryXml.appendChild(keyXml);
             }
@@ -106,9 +112,9 @@ function updatePluginRepositories(templateXml) {
         return;
     }
 
-    var pluginRepositoriesXml = 
+    var pluginRepositoriesXml =
         templateXml.getElementsByTagName('profiles')[0]
-                   .getElementsByTagName('pluginRepositories')[0];
+            .getElementsByTagName('pluginRepositories')[0];
 
     JSON.parse(pluginRepositoriesInput).forEach((pluginRepositoryInput) => {
         var pluginRepositoryXml = templateXml.createElement('pluginRepository');
@@ -125,7 +131,7 @@ function updatePluginRepositories(templateXml) {
                     }
                 }
                 pluginRepositoryXml.appendChild(childXml);
-            } else { 
+            } else {
                 keyXml.textContent = pluginRepositoryInput[key];
                 pluginRepositoryXml.appendChild(keyXml);
             }
@@ -185,6 +191,27 @@ function updatePluginGroups(templateXml) {
 
 }
 
+function objectToXml(obj) {
+    var xml = '';
+    for (var prop in obj) {
+        xml += obj[prop] instanceof Array ? '' : "<" + prop + ">";
+        if (obj[prop] instanceof Array) {
+            for (var array in obj[prop]) {
+                xml += "<" + prop + ">";
+                xml += objectToXml(new Object(obj[prop][array]));
+                xml += "</" + prop + ">";
+            }
+        } else if (typeof obj[prop] == "object") {
+            xml += objectToXml(new Object(obj[prop]));
+        } else {
+            xml += obj[prop];
+        }
+        xml += obj[prop] instanceof Array ? '' : "</" + prop + ">";
+    }
+    xml = xml.replace(/<\/?[0-9]{1,}>/g, '');
+    return xml
+}
+
 module.exports = {
     getSettingsTemplate,
     writeSettings,
@@ -193,5 +220,6 @@ module.exports = {
     updateRepositories,
     updatePluginRepositories,
     updateProfiles,
-    updatePluginGroups
+    updatePluginGroups,
+    objectToXml
 }

@@ -12,8 +12,10 @@ Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<mirrors>`, and
 
 **Optional** json array of servers to add to settings.xml.
 * **id** - The ID of the server (not of the user to login as) that matches the id element of the repository/mirror that Maven tries to connect to.
-* **username** - Required to authenticate to this server.
-* **password** - Required to authenticate to this server.
+* **username**, **password** - These elements appear as a pair denoting the login and password required to authenticate to this server.
+* **privateKey**, **passphrase** - Like the previous two elements, this pair specifies a path to a private key (default is `${user.home}/.ssh/id_dsa`) and a `passphrase`, if required. 
+* **filePermissions**, **directoryPermissions** - When a repository file or directory is created on deployment, these are the permissions to use. The legal values of each is a three digit number corresponding to *nix file permissions, e.g. 664, or 775.
+* **configuration** - Any additional custom configuration for server in JSON format.
 
 Reference: [Maven Settings > Servers](http://maven.apache.org/settings.html#servers)
 
@@ -125,12 +127,74 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 - name: maven-settings-xml-action
   uses: whelk-io/maven-settings-xml-action@v14
   with:
-    repositories: '[{ "id": "some-repository", "name": "some-repository-name", "url": "http://some.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" } }]'
-    plugin_repositories: '[{ "id": "some-plugin-repository", "name": "some-plugin-repository-name", "url": "http://some.plugin.repository.url", "releases": { "enabled": "true" }, "snapshots": { "enabled": "false" }}]'
-    servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
-    mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
-    profiles: '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]'
-    plugin_groups: '[ "some.plugin.group.id", "some.other.plugin.group.id" ]'
+    repositories: |
+      [
+        {
+          "id": "some-repository",
+          "name": "some-repository-name",
+          "url": "http://some.repository.url",
+          "releases": {
+            "enabled": "true"
+          },
+          "snapshots": {
+            "enabled": "false"
+          }
+        }
+      ]
+    plugin_repositories: |
+      [
+        {
+          "id": "some-plugin-repository",
+          "name": "some-plugin-repository-name",
+          "url": "http://some.plugin.repository.url",
+          "releases": {
+            "enabled": "true"
+          },
+          "snapshots": {
+            "enabled": "false"
+          }
+        }
+      ]
+    servers: |
+    [
+      {
+        "id": "some-id",
+        "username": "${env.USER}",
+        "password": "${env.PASS}",
+        "configuration": {
+          "httpConfiguration": {
+            "all": {
+              "usePreemptive": "true"
+            }
+          }
+        }
+      }
+    ]
+    mirrors: |
+      [
+        {
+          "id": "nexus",
+          "mirrorOf": "!my-org-snapshots,*",
+          "url": "http://redacted/nexus/content/groups/public"
+        }
+      ]
+    profiles: |
+      [
+        {
+          "id": "foo.profile",
+          "name": "foo.profile",
+          "url": "http://foo.bar.profile",
+          "properties": {
+            "foo": "property-1",
+            "bar": "property-2"
+          }
+        }
+      ]
+    plugin_groups: |
+      [ 
+        "some.plugin.group.id", 
+        "some.other.plugin.group.id"
+      ]
 
 ````
 
@@ -202,6 +266,17 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
             <id>foo</id>
             <username>fu</username>
             <password>bar</password>
+            <privateKey>${user.home}/.ssh/id_dsa</privateKey>
+            <passphrase>some_passphrase</passphrase>
+            <filePermissions>664</filePermissions>
+            <directoryPermissions>775</directoryPermissions>
+            <configuration>
+                <httpConfiguration>
+                    <all>
+                        <usePreemptive>true</usePreemptive>
+                    </all>
+                </httpConfiguration>
+            </configuration>
         </server>
     </servers>
   
