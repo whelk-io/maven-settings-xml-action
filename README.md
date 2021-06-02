@@ -59,6 +59,9 @@ The `profile` element in the `settings.xml` is a truncated version of the `pom.x
 
 Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
 
+### `include_central`
+**Optional** boolean determining whether to include maven central repo (default is `true`)
+
 ## Simple Usage
 
 ````yaml
@@ -195,6 +198,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
         "some.plugin.group.id", 
         "some.other.plugin.group.id"
       ]
+    include_central: true
 
 ````
 

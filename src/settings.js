@@ -6,9 +6,18 @@ var XMLSerializer = require('xmldom').XMLSerializer;
 
 function getSettingsTemplate() {
     core.info("opening settings template");
+    var includeCentralInput = core.getBooleanInput('include_central');
+
     var templatePath = path.join(__dirname, '../template', 'settings.xml');
     var template = fs.readFileSync(templatePath).toString();
-    return new DOMParser().parseFromString(template, 'text/xml');
+
+    if (includeCentralInput) {
+        return new DOMParser().parseFromString(template, 'text/xml');
+    } else {
+        templatePath = path.join(__dirname, '../template', 'no_central_settings.xml');
+        template = fs.readFileSync(templatePath).toString();
+        return new DOMParser().parseFromString(template, 'text/xml');
+    }
 }
 
 function writeSettings(settingsPath, templateXml) {
