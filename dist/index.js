@@ -3460,6 +3460,10 @@ function getDefaultRepositoryTemplate() {
     return getTemplate('../template', 'default-repository.xml');
 }
 
+function getDefaultActiveProfileTemplate() {
+    return getTemplate('../template', 'default-active-profile.xml');
+}
+
 function getTemplate(filepath, filename) {
     var templatePath = path.join(__dirname, filepath, filename);
     var template = fs.readFileSync(templatePath).toString();
@@ -3490,12 +3494,48 @@ function writeSettings(settingsPath, templateXml) {
 }
 
 function update(templateXml) { 
+    this.updateActiveProfiles(templateXml);
     this.updateServers(templateXml);
     this.updateMirrors(templateXml);
     this.updateRepositories(templateXml);
     this.updatePluginRepositories(templateXml);
     this.updateProfiles(templateXml)
     this.updatePluginGroups(templateXml)
+}
+
+function updateActiveProfiles(templateXml) { 
+
+    var activeProfilesInput = core.getInput('active_profiles');
+
+    if (!activeProfilesInput) {
+        applyDefaultActiveProfile(templateXml);
+        return;
+    }
+
+    var activeProfiles = JSON.parse(activeProfilesInput);
+
+    if (activeProfiles.length == 0) {
+        applyDefaultActiveProfile(templateXml);
+        return;
+    }
+
+    // apply custom repostories
+    activeProfiles.forEach((activeProfileInput) => {
+        activeProfileXml = templateXml.createElement("activeProfile");
+        activeProfileXml.textContent = activeProfileInput;
+        templateXml
+            .getElementsByTagName('activeProfiles')[0]
+            .appendChild(activeProfileXml);
+    });
+
+}
+
+function applyDefaultActiveProfile(templateXml) {
+    var defaultActiveProfile = getDefaultActiveProfileTemplate();
+    
+    templateXml
+        .getElementsByTagName('activeProfiles')[0]
+        .appendChild(defaultActiveProfile);
 }
 
 function updateServers(templateXml) {
@@ -3707,18 +3747,17 @@ function objectToXml(obj) {
 
 module.exports = {
     getSettingsTemplate,
-    getDefaultRepositoryTemplate,
     getTemplate,
     formatSettings,
     writeSettings,
     update,
+    updateActiveProfiles,
     updateServers,
     updateMirrors,
     updateRepositories,
     updatePluginRepositories,
     updateProfiles,
-    updatePluginGroups,
-    objectToXml
+    updatePluginGroups
 }
 
 
