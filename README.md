@@ -309,3 +309,25 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
   
 </settings>
 ````
+
+----
+
+## Local Setup
+
+See [CONTRIBUTING.md](Contributing) for guidelines for forking and contributing to this project.
+
+**Install Dependencies**
+
+`npm ci`
+
+**Run Linter**
+
+`npm run lint`
+
+**Run Unit-Tests**
+
+`npm test`
+
+**Create Distribution**
+
+`npm run build`
