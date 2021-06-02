@@ -35,7 +35,26 @@ Reference: [Maven Settings > Mirrors](http://maven.apache.org/settings.html#mirr
 * **releases.enabled** - Enable release policy.
 * **snapshots.enabled** - Enable snapshot policy.
 
-Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settings.html#repositories)
+When not `repostories` is empty or null, the Maven Central repository is applied by default:
+
+```yaml
+repositories: |
+  [
+    {
+      "id": "central",
+      "name": "Maven Central",
+      "url": "https://repo1.maven.org/maven2",
+      "releases": {
+        "enabled": "true"
+      },
+      "snapshots": {
+        "enabled": "false"
+      }
+    }
+  ]
+```
+
+Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html#repositories)
 
 ### `plugin_repositories`
 **Optional** json array of repositories to add to settings.xml
@@ -45,7 +64,7 @@ Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settin
 * **releases.enabled** - Enable release policy.
 * **snapshots.enabled** - Enable snapshot policy.
 
-Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html#Plugin_Repositories)
+Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settings.html#Plugin_Repositories)
 
 ### `plugin_groups`
 **Optional** json array of plugin groups to add to settings.xml
@@ -59,18 +78,28 @@ The `profile` element in the `settings.xml` is a truncated version of the `pom.x
 
 Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
 
-## Simple Usage
+
+### `activeProfiles`
+**Optional** json array of active profiles to add to settings.xml
+
+Set of `activeProfile` elements, which each have a value of a `profile` `id`. Any `profile` `id` defined as an `activeProfile` will be active, regardless of any environment settings. If no matching profile is found nothing will happen. For example, if `env-test` is an `activeProfile`, a profile in a `pom.xml` (or `profile.xml`) with a corresponding `id` will be active. If no such profile is found then execution will continue as normal.
+
+Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.html#Active_Profiles)
+
+---
+
+## Basic Usage
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v16
+  uses: whelk-io/maven-settings-xml-action@v17
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
 
-## Simple settings.xml
+**Output**
 
 ````xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" 
@@ -86,16 +115,6 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
         <profile>
             <id>github</id>
             <repositories>
-                <repository>
-                    <id>central</id>
-                    <url>https://repo1.maven.org/maven2</url>
-                    <releases>
-                        <enabled>true</enabled>
-                    </releases>
-                    <snapshots>
-                        <enabled>false</enabled>
-                    </snapshots>
-                </repository>
                 <repository>
                     <id>some-repository</id>
                     <url>http://some.repository.url</url>
@@ -121,11 +140,13 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 </settings>
 ````
 
+----
+
 ## Full Usage
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v16
+  uses: whelk-io/maven-settings-xml-action@v17
   with:
     repositories: |
       [
@@ -195,10 +216,13 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
         "some.plugin.group.id", 
         "some.other.plugin.group.id"
       ]
-
+    active_profiles: |
+      [ 
+        "some-profile"
+      ]
 ````
 
-## Full settings.xml
+**Output**
 
 ````xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" 
@@ -207,23 +231,13 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
                               http://maven.apache.org/xsd/settings-1.0.0.xsd">
   
     <activeProfiles>
-        <activeProfile>github</activeProfile>
+        <activeProfile>some-profile</activeProfile>
     </activeProfiles>
   
     <profiles>
         <profile>
             <id>github</id>
             <repositories>
-                <repository>
-                    <id>central</id>
-                    <url>https://repo1.maven.org/maven2</url>
-                    <releases>
-                        <enabled>true</enabled>
-                    </releases>
-                    <snapshots>
-                        <enabled>false</enabled>
-                    </snapshots>
-                </repository>
                 <repository>
                     <id>some-repository</id>
                     <name>some-repository-name</name>
@@ -295,3 +309,25 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
   
 </settings>
 ````
+
+----
+
+## Local Setup
+
+See [CONTRIBUTING.md](Contributing) for guidelines for forking and contributing to this project.
+
+**Install Dependencies**
+
+`npm ci`
+
+**Run Linter**
+
+`npm run lint`
+
+**Run Unit-Tests**
+
+`npm test`
+
+**Create Distribution**
+
+`npm run build`

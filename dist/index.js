@@ -51,6 +51,7 @@ module.exports =
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -82,14 +83,27 @@ module.exports = require("os");
 "use strict";
 
 // For internal use, subject to change.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.issueCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fs = __importStar(__webpack_require__(747));
@@ -117,14 +131,27 @@ exports.issueCommand = issueCommand;
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.issue = exports.issueCommand = void 0;
 const os = __importStar(__webpack_require__(87));
 const utils_1 = __webpack_require__(82);
 /**
@@ -1483,6 +1510,25 @@ try{
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -1492,14 +1538,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __webpack_require__(431);
 const file_command_1 = __webpack_require__(102);
 const utils_1 = __webpack_require__(82);
@@ -1566,7 +1606,9 @@ function addPath(inputPath) {
 }
 exports.addPath = addPath;
 /**
- * Gets the value of an input.  The value is also trimmed.
+ * Gets the value of an input.
+ * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
+ * Returns an empty string if the value is not defined.
  *
  * @param     name     name of the input to get
  * @param     options  optional. See InputOptions.
@@ -1577,9 +1619,34 @@ function getInput(name, options) {
     if (options && options.required && !val) {
         throw new Error(`Input required and not supplied: ${name}`);
     }
+    if (options && options.trimWhitespace === false) {
+        return val;
+    }
     return val.trim();
 }
 exports.getInput = getInput;
+/**
+ * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
+ * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
+ * The return value is also in boolean type.
+ * ref: https://yaml.org/spec/1.2/spec.html#id2804923
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   boolean
+ */
+function getBooleanInput(name, options) {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    const val = getInput(name, options);
+    if (trueValue.includes(val))
+        return true;
+    if (falseValue.includes(val))
+        return false;
+    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+exports.getBooleanInput = getBooleanInput;
 /**
  * Sets the value of an output.
  *
@@ -2377,6 +2444,256 @@ exports.ParseError = ParseError;
 
 /***/ }),
 
+/***/ 506:
+/***/ (function(module) {
+
+/**
+ * @typedef {Object} ParsingOptions
+ *  @property {function(node)} filter Returns false to exclude a node. Default is true.
+ */
+
+/**
+ * Parse the given XML string into an object.
+ *
+ * @param {String} xml
+ * @param {ParsingOptions} [options]
+ * @return {Object}
+ * @api public
+ */
+function parse(xml, options = {}) {
+
+    options.filter = options.filter || (() => true);
+
+    function nextChild() {
+        return tag() || content() || comment() || cdata();
+    }
+
+    function nextRootChild() {
+        match(/\s*/);
+        return tag(true) || comment() || doctype() || processingInstruction(false);
+    }
+
+    function document() {
+        const decl = declaration();
+        const children = [];
+        let documentRootNode;
+        let child = nextRootChild();
+
+        while (child) {
+            if (child.node.type === 'Element') {
+                if (documentRootNode) {
+                    throw new Error('Found multiple root nodes');
+                }
+                documentRootNode = child.node;
+            }
+
+            if (!child.excluded) {
+                children.push(child.node);
+            }
+
+            child = nextRootChild();
+        }
+
+        if (!documentRootNode) {
+            throw new Error('Failed to parse XML');
+        }
+
+        return {
+            declaration: decl ? decl.node : null,
+            root: documentRootNode,
+            children
+        };
+    }
+
+    function declaration() {
+        return processingInstruction(true);
+    }
+
+    function processingInstruction(matchDeclaration) {
+        const m = matchDeclaration ? match(/^<\?(xml)\s*/) : match(/^<\?([\w-:.]+)\s*/);
+        if (!m) return;
+
+        // tag
+        const node = {
+            name: m[1],
+            type: 'ProcessingInstruction',
+            attributes: {}
+        };
+
+        // attributes
+        while (!(eos() || is('?>'))) {
+            const attr = attribute();
+            if (!attr) return node;
+            node.attributes[attr.name] = attr.value;
+        }
+
+        match(/\?>/);
+
+        return {
+            excluded: matchDeclaration ? false : options.filter(node) === false,
+            node
+        };
+    }
+
+    function tag(matchRoot) {
+        const m = match(/^<([\w-:.]+)\s*/);
+        if (!m) return;
+
+        // name
+        const node = {
+            type: 'Element',
+            name: m[1],
+            attributes: {},
+            children: []
+        };
+
+        // attributes
+        while (!(eos() || is('>') || is('?>') || is('/>'))) {
+            const attr = attribute();
+            if (!attr) return node;
+            node.attributes[attr.name] = attr.value;
+        }
+
+        const excluded = matchRoot ? false : options.filter(node) === false;
+
+        // self closing tag
+        if (match(/^\s*\/>/)) {
+            node.children = null;
+            return {
+                excluded,
+                node
+            };
+        }
+
+        match(/\??>/);
+
+        if (!excluded) {
+            // children
+            let child = nextChild();
+            while (child) {
+                if (!child.excluded) {
+                    node.children.push(child.node);
+                }
+                child = nextChild();
+            }
+        }
+
+        // closing
+        match(/^<\/[\w-:.]+>/);
+
+        return {
+            excluded,
+            node
+        };
+    }
+
+    function doctype() {
+        const m = match(/^<!DOCTYPE\s+[^>]*>/);
+        if (m) {
+            const node = {
+                type: 'DocumentType',
+                content: m[0]
+            };
+            return {
+                excluded: options.filter(node) === false,
+                node
+            };
+        }
+    }
+
+    function cdata() {
+        if (xml.startsWith('<![CDATA[')) {
+            const endPositionStart = xml.indexOf(']]>');
+            if (endPositionStart > -1) {
+                const endPositionFinish  = endPositionStart + 3;
+                const node = {
+                    type: 'CDATA',
+                    content: xml.substring(0, endPositionFinish)
+                };
+                xml = xml.slice(endPositionFinish);
+                return {
+                    excluded: options.filter(node) === false,
+                    node
+                };
+            }
+        }
+    }
+
+    function comment() {
+        const m = match(/^<!--[\s\S]*?-->/);
+        if (m) {
+            const node = {
+                type: 'Comment',
+                content: m[0]
+            };
+            return {
+                excluded: options.filter(node) === false,
+                node
+            };
+        }
+    }
+
+    function content() {
+        const m = match(/^([^<]+)/);
+        if (m) {
+            const node = {
+                type: 'Text',
+                content: m[1]
+            };
+            return {
+                excluded: options.filter(node) === false,
+                node
+            };
+        }
+    }
+
+    function attribute() {
+        const m = match(/([\w:-]+)\s*=\s*("[^"]*"|'[^']*'|\w+)\s*/);
+        if (!m) return;
+        return {name: m[1], value: strip(m[2])}
+    }
+
+    /**
+     * Strip quotes from `val`.
+     */
+    function strip(val) {
+        return val.replace(/^['"]|['"]$/g, '');
+    }
+
+    /**
+     * Match `re` and advance the string.
+     */
+    function match(re) {
+        const m = xml.match(re);
+        if (!m) return;
+        xml = xml.slice(m[0].length);
+        return m;
+    }
+
+    /**
+     * End-of-source.
+     */
+    function eos() {
+        return 0 === xml.length;
+    }
+
+    /**
+     * Check for `prefix`.
+     */
+    function is(prefix) {
+        return 0 === xml.indexOf(prefix);
+    }
+
+    xml = xml.trim();
+
+    return document();
+}
+
+module.exports = parse;
+
+
+/***/ }),
+
 /***/ 622:
 /***/ (function(module) {
 
@@ -2398,12 +2715,7 @@ function run() {
     var templateXml = settings.getSettingsTemplate();
 
     // update from action input
-    settings.updateServers(templateXml);
-    settings.updateMirrors(templateXml);
-    settings.updateRepositories(templateXml);
-    settings.updatePluginRepositories(templateXml);
-    settings.updateProfiles(templateXml)
-    settings.updatePluginGroups(templateXml)
+    settings.update(templateXml);
 
     // write template to filepath
     var settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
@@ -2419,6 +2731,197 @@ run();
 module.exports = {
   run
 }
+
+/***/ }),
+
+/***/ 701:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+/**
+ * @typedef {Object} XMLFormatterOptions
+ *  @property {String} [indentation='    '] The value used for indentation
+ *  @property {function(node): boolean} [filter] Return false to exclude the node.
+ *  @property {Boolean} [collapseContent=false] True to keep content in the same line as the element. Only works if element contains at least one text node
+ *  @property {String} [lineSeparator='\r\n'] The line separator to use
+ *  @property {String} [whiteSpaceAtEndOfSelfclosingTag=false] to either end ad self closing tag with `<tag/>` or `<tag />`
+ */
+
+/**
+ * @typedef {Object} XMLFormatterState
+ * @param {String} content
+ * @param {Number} level
+ * @param {XMLFormatterOptions} options
+ */
+
+/**
+ * @param {XMLFormatterState} state
+ * @return {void}
+ */
+function newLine(state) {
+    if (!state.options.indentation && !state.options.lineSeparator) return;
+    state.content += state.options.lineSeparator;
+    let i;
+    for (i = 0; i < state.level; i++) {
+        state.content += state.options.indentation;
+    }
+}
+
+/**
+ * @param {XMLFormatterState} state
+ * @param {String} content
+ * @return {void}
+ */
+function appendContent(state, content) {
+    state.content += content;
+}
+
+/**
+ * @param {Object} node
+ * @param {XMLFormatterState} state
+ * @param {Boolean} preserveSpace
+ * @return {void}
+ */
+function processNode(node, state, preserveSpace) {
+    if (typeof node.content === 'string') {
+        processContentNode(node, state, preserveSpace);
+    } else if (node.type === 'Element') {
+        processElementNode(node, state, preserveSpace);
+    } else if (node.type === 'ProcessingInstruction') {
+        processProcessingIntruction(node, state, preserveSpace);
+    } else {
+        throw new Error('Unknown node type: ' + node.type);
+    }
+}
+
+/**
+ * @param {Object} node
+ * @param {XMLFormatterState} state
+ * @param {Boolean} preserveSpace
+ * @return {void}
+ */
+function processContentNode(node, state, preserveSpace) {
+    if (!preserveSpace) {
+        node.content = node.content.trim();
+    }
+    if (node.content.length > 0) {
+        if (!preserveSpace && state.content.length > 0) {
+            newLine(state);
+        }
+        appendContent(state, node.content);
+    }
+}
+
+/**
+ * @param {Object} node
+ * @param {XMLFormatterState} state
+ * @param {Boolean} preserveSpace
+ * @return {void}
+ */
+function processElementNode(node, state, preserveSpace) {
+    if (!preserveSpace && state.content.length > 0) {
+        newLine(state);
+    }
+
+    appendContent(state, '<' + node.name);
+    processAttributes(state, node.attributes);
+
+    if (node.children === null) {
+        const selfClosingNodeClosingTag = state.options.whiteSpaceAtEndOfSelfclosingTag ? ' />' : '/>'
+        // self-closing node
+        appendContent(state, selfClosingNodeClosingTag);
+    } else if (node.children.length === 0) {
+        // empty node
+        appendContent(state, '></' + node.name + '>');
+    } else {
+
+        appendContent(state, '>');
+
+        state.level++;
+
+        let nodePreserveSpace = node.attributes['xml:space'] === 'preserve';
+
+        if (!nodePreserveSpace && state.options.collapseContent) {
+
+            const containsTextNodes = node.children.some(function(child) {
+                return child.type === 'Text' && child.content.trim() !== '';
+            });
+
+            if (containsTextNodes) {
+                nodePreserveSpace = true;
+            }
+        }
+
+        node.children.forEach(function(child) {
+            processNode(child, state, preserveSpace || nodePreserveSpace, state.options);
+        });
+
+        state.level--;
+
+        if (!preserveSpace && !nodePreserveSpace) {
+            newLine(state);
+        }
+        appendContent(state, '</' + node.name + '>');
+    }
+}
+
+/**
+ * @param {XMLFormatterState} state
+ * @param {Record<String, String>} attributes
+ * @return {void}
+ */
+function processAttributes(state, attributes) {
+    Object.keys(attributes).forEach(function(attr) {
+        const escaped = attributes[attr].replace(/"/g, '&quot;');
+        appendContent(state, ' ' + attr + '="' + escaped + '"');
+    });
+}
+
+/**
+ * @param {Object} node
+ * @param {XMLFormatterState} state
+ * @return {void}
+ */
+function processProcessingIntruction(node, state) {
+    if (state.content.length > 0) {
+        newLine(state);
+    }
+    appendContent(state, '<?' + node.name);
+    processAttributes(state, node.attributes);
+    appendContent(state, '?>');
+}
+
+
+/**
+ * Converts the given XML into human readable format.
+ *
+ * @param {String} xml
+ * @param {XMLFormatterOptions} options
+ * @returns {string}
+ */
+function format(xml, options = {}) {
+    options.indentation = 'indentation' in options ? options.indentation : '    ';
+    options.collapseContent = options.collapseContent === true;
+    options.lineSeparator = 'lineSeparator' in options ? options.lineSeparator : '\r\n';
+    options.whiteSpaceAtEndOfSelfclosingTag = !!options.whiteSpaceAtEndOfSelfclosingTag;
+
+    const parser = __webpack_require__(506);
+    const parsedXml = parser(xml, {filter: options.filter});
+    const state = {content: '', level: 0, options: options};
+
+    if (parsedXml.declaration) {
+        processProcessingIntruction(parsedXml.declaration, state);
+    }
+
+    parsedXml.children.forEach(function(child) {
+        processNode(child, state, false);
+    });
+
+    return state.content;
+}
+
+
+module.exports = format;
+
 
 /***/ }),
 
@@ -2947,12 +3450,35 @@ var path = __webpack_require__(622);
 var fs = __webpack_require__(747);
 var DOMParser = __webpack_require__(721).DOMParser;
 var XMLSerializer = __webpack_require__(721).XMLSerializer;
+var format = __webpack_require__(701);
 
 function getSettingsTemplate() {
-    core.info("opening settings template");
-    var templatePath = __webpack_require__.ab + "settings.xml";
-    var template = fs.readFileSync(__webpack_require__.ab + "settings.xml").toString();
+    return getTemplate('../template', 'settings.xml');
+}
+
+function getDefaultRepositoryTemplate() {
+    return getTemplate('../template', 'default-repository.xml');
+}
+
+function getDefaultActiveProfileTemplate() {
+    return getTemplate('../template', 'default-active-profile.xml');
+}
+
+function getTemplate(filepath, filename) {
+    var templatePath = path.join(__dirname, filepath, filename);
+    var template = fs.readFileSync(templatePath).toString();
     return new DOMParser().parseFromString(template, 'text/xml');
+}
+
+function formatSettings(templateXml) {
+    var settingStr = new XMLSerializer().serializeToString(templateXml);
+
+    // format xml to standard format
+    return format(settingStr, {
+        indentation: '  ',
+        collapsetent: true,
+        lineSeparator: '\n'
+    });
 }
 
 function writeSettings(settingsPath, templateXml) {
@@ -2961,9 +3487,55 @@ function writeSettings(settingsPath, templateXml) {
         fs.mkdirSync(path.dirname(settingsPath));
     }
 
+    var formattedXml = formatSettings(templateXml);
+
     core.info("writing settings.xml to path: " + settingsPath)
-    var settingStr = new XMLSerializer().serializeToString(templateXml);
-    fs.writeFileSync(settingsPath, settingStr);
+    fs.writeFileSync(settingsPath, formattedXml);
+}
+
+function update(templateXml) { 
+    this.updateActiveProfiles(templateXml);
+    this.updateServers(templateXml);
+    this.updateMirrors(templateXml);
+    this.updateRepositories(templateXml);
+    this.updatePluginRepositories(templateXml);
+    this.updateProfiles(templateXml)
+    this.updatePluginGroups(templateXml)
+}
+
+function updateActiveProfiles(templateXml) { 
+
+    var activeProfilesInput = core.getInput('active_profiles');
+
+    if (!activeProfilesInput) {
+        applyDefaultActiveProfile(templateXml);
+        return;
+    }
+
+    var activeProfiles = JSON.parse(activeProfilesInput);
+
+    if (activeProfiles.length == 0) {
+        applyDefaultActiveProfile(templateXml);
+        return;
+    }
+
+    // apply custom repostories
+    activeProfiles.forEach((activeProfileInput) => {
+        activeProfileXml = templateXml.createElement("activeProfile");
+        activeProfileXml.textContent = activeProfileInput;
+        templateXml
+            .getElementsByTagName('activeProfiles')[0]
+            .appendChild(activeProfileXml);
+    });
+
+}
+
+function applyDefaultActiveProfile(templateXml) {
+    var defaultActiveProfile = getDefaultActiveProfileTemplate();
+    
+    templateXml
+        .getElementsByTagName('activeProfiles')[0]
+        .appendChild(defaultActiveProfile);
 }
 
 function updateServers(templateXml) {
@@ -3018,14 +3590,19 @@ function updateRepositories(templateXml) {
     var repositoriesInput = core.getInput('repositories');
 
     if (!repositoriesInput) {
+        applyDefaultRepository(templateXml);
         return;
     }
 
-    var repositoriesXml =
-        templateXml.getElementsByTagName('profiles')[0]
-            .getElementsByTagName('repositories')[0];
+    var repositories = JSON.parse(repositoriesInput);
 
-    JSON.parse(repositoriesInput).forEach((repositoryInput) => {
+    if (repositories.length == 0) {
+        applyDefaultRepository(templateXml);
+        return;
+    }
+
+    // apply custom repostories
+    repositories.forEach((repositoryInput) => {
         var repositoryXml = templateXml.createElement('repository');
         for (var key in repositoryInput) {
             var keyXml = templateXml.createElement(key);
@@ -3045,8 +3622,20 @@ function updateRepositories(templateXml) {
                 repositoryXml.appendChild(keyXml);
             }
         }
-        repositoriesXml.appendChild(repositoryXml);
+        templateXml
+            .getElementsByTagName('profiles')[0]
+            .getElementsByTagName('repositories')[0]
+            .appendChild(repositoryXml);
     });
+}
+
+function applyDefaultRepository(templateXml) {
+    var defaultRepositoryTemplate = getDefaultRepositoryTemplate();
+    
+    templateXml
+        .getElementsByTagName('profiles')[0]
+        .getElementsByTagName('repositories')[0]
+        .appendChild(defaultRepositoryTemplate);
 }
 
 function updatePluginRepositories(templateXml) {
@@ -3152,21 +3741,25 @@ function objectToXml(obj) {
         }
         xml += obj[prop] instanceof Array ? '' : "</" + prop + ">";
     }
-    var xml = xml.replace(/<\/?[0-9]{1,}>/g, '');
+    xml = xml.replace(/<\/?[0-9]{1,}>/g, '');
     return xml
 }
 
 module.exports = {
     getSettingsTemplate,
+    getTemplate,
+    formatSettings,
     writeSettings,
+    update,
+    updateActiveProfiles,
     updateServers,
     updateMirrors,
     updateRepositories,
     updatePluginRepositories,
     updateProfiles,
-    updatePluginGroups,
-    objectToXml
+    updatePluginGroups
 }
+
 
 /***/ })
 

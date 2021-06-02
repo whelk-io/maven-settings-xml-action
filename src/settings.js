@@ -3,12 +3,35 @@ var path = require('path');
 var fs = require('fs');
 var DOMParser = require('xmldom').DOMParser;
 var XMLSerializer = require('xmldom').XMLSerializer;
+var format = require('xml-formatter');
 
 function getSettingsTemplate() {
-    core.info("opening settings template");
-    var templatePath = path.join(__dirname, '../template', 'settings.xml');
+    return getTemplate('../template', 'settings.xml');
+}
+
+function getDefaultRepositoryTemplate() {
+    return getTemplate('../template', 'default-repository.xml');
+}
+
+function getDefaultActiveProfileTemplate() {
+    return getTemplate('../template', 'default-active-profile.xml');
+}
+
+function getTemplate(filepath, filename) {
+    var templatePath = path.join(__dirname, filepath, filename);
     var template = fs.readFileSync(templatePath).toString();
     return new DOMParser().parseFromString(template, 'text/xml');
+}
+
+function formatSettings(templateXml) {
+    var settingStr = new XMLSerializer().serializeToString(templateXml);
+
+    // format xml to standard format
+    return format(settingStr, {
+        indentation: '  ',
+        collapsetent: true,
+        lineSeparator: '\n'
+    });
 }
 
 function writeSettings(settingsPath, templateXml) {
@@ -17,9 +40,55 @@ function writeSettings(settingsPath, templateXml) {
         fs.mkdirSync(path.dirname(settingsPath));
     }
 
+    var formattedXml = formatSettings(templateXml);
+
     core.info("writing settings.xml to path: " + settingsPath)
-    var settingStr = new XMLSerializer().serializeToString(templateXml);
-    fs.writeFileSync(settingsPath, settingStr);
+    fs.writeFileSync(settingsPath, formattedXml);
+}
+
+function update(templateXml) { 
+    this.updateActiveProfiles(templateXml);
+    this.updateServers(templateXml);
+    this.updateMirrors(templateXml);
+    this.updateRepositories(templateXml);
+    this.updatePluginRepositories(templateXml);
+    this.updateProfiles(templateXml)
+    this.updatePluginGroups(templateXml)
+}
+
+function updateActiveProfiles(templateXml) { 
+
+    var activeProfilesInput = core.getInput('active_profiles');
+
+    if (!activeProfilesInput) {
+        applyDefaultActiveProfile(templateXml);
+        return;
+    }
+
+    var activeProfiles = JSON.parse(activeProfilesInput);
+
+    if (activeProfiles.length == 0) {
+        applyDefaultActiveProfile(templateXml);
+        return;
+    }
+
+    // apply custom repostories
+    activeProfiles.forEach((activeProfileInput) => {
+        activeProfileXml = templateXml.createElement("activeProfile");
+        activeProfileXml.textContent = activeProfileInput;
+        templateXml
+            .getElementsByTagName('activeProfiles')[0]
+            .appendChild(activeProfileXml);
+    });
+
+}
+
+function applyDefaultActiveProfile(templateXml) {
+    var defaultActiveProfile = getDefaultActiveProfileTemplate();
+    
+    templateXml
+        .getElementsByTagName('activeProfiles')[0]
+        .appendChild(defaultActiveProfile);
 }
 
 function updateServers(templateXml) {
@@ -74,14 +143,19 @@ function updateRepositories(templateXml) {
     var repositoriesInput = core.getInput('repositories');
 
     if (!repositoriesInput) {
+        applyDefaultRepository(templateXml);
         return;
     }
 
-    var repositoriesXml =
-        templateXml.getElementsByTagName('profiles')[0]
-            .getElementsByTagName('repositories')[0];
+    var repositories = JSON.parse(repositoriesInput);
 
-    JSON.parse(repositoriesInput).forEach((repositoryInput) => {
+    if (repositories.length == 0) {
+        applyDefaultRepository(templateXml);
+        return;
+    }
+
+    // apply custom repostories
+    repositories.forEach((repositoryInput) => {
         var repositoryXml = templateXml.createElement('repository');
         for (var key in repositoryInput) {
             var keyXml = templateXml.createElement(key);
@@ -101,8 +175,20 @@ function updateRepositories(templateXml) {
                 repositoryXml.appendChild(keyXml);
             }
         }
-        repositoriesXml.appendChild(repositoryXml);
+        templateXml
+            .getElementsByTagName('profiles')[0]
+            .getElementsByTagName('repositories')[0]
+            .appendChild(repositoryXml);
     });
+}
+
+function applyDefaultRepository(templateXml) {
+    var defaultRepositoryTemplate = getDefaultRepositoryTemplate();
+    
+    templateXml
+        .getElementsByTagName('profiles')[0]
+        .getElementsByTagName('repositories')[0]
+        .appendChild(defaultRepositoryTemplate);
 }
 
 function updatePluginRepositories(templateXml) {
@@ -214,12 +300,15 @@ function objectToXml(obj) {
 
 module.exports = {
     getSettingsTemplate,
+    getTemplate,
+    formatSettings,
     writeSettings,
+    update,
+    updateActiveProfiles,
     updateServers,
     updateMirrors,
     updateRepositories,
     updatePluginRepositories,
     updateProfiles,
-    updatePluginGroups,
-    objectToXml
+    updatePluginGroups
 }
