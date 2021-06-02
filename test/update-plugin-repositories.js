@@ -1,8 +1,6 @@
 var assert = require('assert');
 var process = require('process');
 var settings = require('../src/settings')
-var XMLSerializer = require('xmldom').XMLSerializer;
-var DOMParser = require('xmldom').DOMParser;
 
 describe('validate plugin repositories', function () {
 
