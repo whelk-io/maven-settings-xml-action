@@ -84,5 +84,25 @@ describe('validate servers', function () {
         });
     });
 
+    describe('when environment variables are present', function () {
+        it('<server/> should be appended with <server> and include all environment variables', function () {
+            // given input
+            process.env['INPUT_SERVERS'] = '[{ "id": "foo", "username": "${env.USERNAME}", "password": "${env.PASSWORD}" }]';
+
+            // when
+            var actualXml = settings.getSettingsTemplate();
+            settings.update(actualXml);
+            var actual = settings.formatSettings(actualXml);
+
+            // then
+            var expectedXml = settings.getTemplate('../test/resources/', 'when-servers-with-env-variables.xml');
+            expected = settings.formatSettings(expectedXml);
+            assert.equal(actual, expected);
+
+            // tear down
+            process.env['INPUT_SERVERS'] = '';
+        });
+    });
+
 });
 
