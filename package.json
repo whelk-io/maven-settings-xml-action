@@ -23,8 +23,10 @@
   },
   "scripts": {
     "lint": "eslint ./src/*.js",
-    "prepare": "ncc build src/index.js -o dist",
-    "test": "mocha"
+    "test": "mocha",
+    "build_index": "ncc build src/index.js -o dist ",
+    "copy_templates": "rm -rf dist/template && mkdir dist/template && cp -a template/. dist/template/",
+    "build": "npm run build_index && npm run copy_templates"
   },
   "repository": {
     "type": "git",
