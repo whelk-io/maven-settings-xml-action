@@ -66,7 +66,6 @@ Reference: [Maven Settings > Repositories](http://maven.apache.org/settings.html
 
 Reference: [Maven Settings > Plugin Repositories](http://maven.apache.org/settings.html#Plugin_Repositories)
 
-
 ### `plugin_groups`
 **Optional** json array of plugin groups to add to settings.xml
 
@@ -79,7 +78,17 @@ The `profile` element in the `settings.xml` is a truncated version of the `pom.x
 
 Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
 
-## Simple Usage
+
+### `activeProfiles`
+**Optional** json array of active profiles to add to settings.xml
+
+Set of `activeProfile` elements, which each have a value of a `profile` `id`. Any `profile` `id` defined as an `activeProfile` will be active, regardless of any environment settings. If no matching profile is found nothing will happen. For example, if `env-test` is an `activeProfile`, a profile in a `pom.xml` (or `profile.xml`) with a corresponding `id` will be active. If no such profile is found then execution will continue as normal.
+
+Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.html#Active_Profiles)
+
+---
+
+## Basic Usage
 
 ````yaml
 - name: maven-settings-xml-action
@@ -90,7 +99,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
     servers: '[{ "id": "some-server", "username": "some.user", "password": "some.password" }]'
 ````
 
-## Simple settings.xml
+**Output**
 
 ````xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" 
@@ -130,6 +139,8 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
   
 </settings>
 ````
+
+----
 
 ## Full Usage
 
@@ -205,10 +216,13 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
         "some.plugin.group.id", 
         "some.other.plugin.group.id"
       ]
-
+    active_profiles: |
+      [ 
+        "some-profile"
+      ]
 ````
 
-## Full settings.xml
+**Output**
 
 ````xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" 
@@ -217,7 +231,7 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
                               http://maven.apache.org/xsd/settings-1.0.0.xsd">
   
     <activeProfiles>
-        <activeProfile>github</activeProfile>
+        <activeProfile>some-profile</activeProfile>
     </activeProfiles>
   
     <profiles>
