@@ -1,12 +1,10 @@
 var assert = require('assert');
 var process = require('process');
 var settings = require('../src/settings')
-var XMLSerializer = require('xmldom').XMLSerializer;
-var DOMParser = require('xmldom').DOMParser;
 
 describe('validate plugin groups', function () {
 
-    describe('when plugin groups input', function () {
+    describe('when input present', function () {
         it('<pluginGroups/> should be appended with <pluginGroup> when input.pluginGroups is present', function () {
             // given input
             process.env['INPUT_PLUGIN_GROUPS'] = '[ "some.plugin.group.id" ]';
