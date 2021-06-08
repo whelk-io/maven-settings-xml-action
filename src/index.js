@@ -3,7 +3,6 @@ var settings = require('./settings');
 var os = require('os');
 var path = require('path');
 var fs = require('fs');
-var XMLSerializer = require('xmldom').XMLSerializer;
 
 function run() {
   try {
@@ -14,7 +13,7 @@ function run() {
     settings.update(templateXml);
 
     // format to xml
-    var formattedXml = formatSettings(templateXml);
+    var formattedXml = settings.formatSettings(templateXml);
 
     // get custom output path
     var settingsPath = getSettingsPath();
@@ -36,17 +35,6 @@ function getSettingsPath() {
   return path.join(os.homedir(), '.m2', 'settings.xml');
 }
 
-function formatSettings(templateXml) {
-  var settingStr = new XMLSerializer().serializeToString(templateXml);
-
-  // format xml to standard format
-  return format(settingStr, {
-      indentation: '  ',
-      collapsetent: true,
-      lineSeparator: '\n'
-  });
-}
-
 function writeSettings(settingsPath, formattedXml) {
   if (!fs.existsSync(path.dirname(settingsPath))) {
       core.info("creating directory for settings.xml: " + settingsPath);
@@ -62,6 +50,5 @@ run();
 module.exports = {
   run,
   getSettingsPath,
-  writeSettings,
-  formatSettings
+  writeSettings
 }
