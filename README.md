@@ -223,6 +223,7 @@ Target path to generate `settings.xml`. By default, `~/.m2/settings.xml` is used
       [ 
         "some-profile"
       ]
+    output_file: [ "~/.m2/settings.xml" ]
 ````
 
 **Output**

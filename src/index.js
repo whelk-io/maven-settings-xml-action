@@ -27,7 +27,7 @@ function run() {
 }
 
 function getSettingsPath() {
-  var outputPath = core.getInput('output_path');
+  var outputPath = core.getInput('output_file');
   if (outputPath != null && outputPath.trim() != '') {
     return path.join(outputPath);
   }
