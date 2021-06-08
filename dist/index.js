@@ -2708,6 +2708,7 @@ var core = __webpack_require__(470);
 var settings = __webpack_require__(814);
 var os = __webpack_require__(87);
 var path = __webpack_require__(622);
+var fs = __webpack_require__(747);
 
 function run() {
   try {
@@ -2717,19 +2718,45 @@ function run() {
     // update from action input
     settings.update(templateXml);
 
+    // format to xml
+    var formattedXml = settings.formatSettings(templateXml);
+
+    // get custom output path
+    var settingsPath = this.getSettingsPath();
+
     // write template to filepath
-    var settingsPath = path.join(os.homedir(), '.m2', 'settings.xml');
-    settings.writeSettings(settingsPath, templateXml);
+    settings.writeSettings(settingsPath, formattedXml);
 
   } catch (error) {
     core.setFailed(error.message);
   }
 }
 
+function getSettingsPath() {
+  var outputPath = core.getInput('output_path');
+  if (outputPath != null && outputPath.trim() != '') {
+    return path.join(outputPath);
+  }
+
+  return path.join(os.homedir(), '.m2', 'settings.xml');
+}
+
+function writeSettings(settingsPath, formattedXml) {
+  if (!fs.existsSync(path.dirname(settingsPath))) {
+      core.info("creating directory for settings.xml: " + settingsPath);
+      fs.mkdirSync(path.dirname(settingsPath));
+  }
+
+  core.info("writing settings.xml to path: " + settingsPath)
+  fs.writeFileSync(settingsPath, formattedXml);
+}
+
 run();
 
 module.exports = {
-  run
+  run,
+  getSettingsPath,
+  writeSettings
 }
 
 /***/ }),
@@ -3481,18 +3508,6 @@ function formatSettings(templateXml) {
     });
 }
 
-function writeSettings(settingsPath, templateXml) {
-    if (!fs.existsSync(path.dirname(settingsPath))) {
-        core.info("creating ~/.m2 directory");
-        fs.mkdirSync(path.dirname(settingsPath));
-    }
-
-    var formattedXml = formatSettings(templateXml);
-
-    core.info("writing settings.xml to path: " + settingsPath)
-    fs.writeFileSync(settingsPath, formattedXml);
-}
-
 function update(templateXml) { 
     this.updateActiveProfiles(templateXml);
     this.updateServers(templateXml);
@@ -3749,7 +3764,6 @@ module.exports = {
     getSettingsTemplate,
     getTemplate,
     formatSettings,
-    writeSettings,
     update,
     updateActiveProfiles,
     updateServers,

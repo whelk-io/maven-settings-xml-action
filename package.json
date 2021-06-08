@@ -1,6 +1,6 @@
 {
   "name": "maven-settings-xml-action",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Update maven ~/.m2/settings.xml",
   "main": "src/index.js",
   "directories": {
