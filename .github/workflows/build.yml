@@ -8,6 +8,7 @@ on: # rebuild any PRs and main branch changes
       - develop
 
 jobs:
+
   build: # make sure build/ci work properly
     runs-on: ubuntu-latest
     steps:
@@ -15,12 +16,12 @@ jobs:
       - run: |
           npm ci
           npm test
-  test_job:
+
+  test-basic:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.3.4
-      - name: Create maven settings.xml
-        uses: ./
+      - uses: ./
         with:
           servers: '[{"id": "foo", "username": "fu", "password": "bar" }]'
           mirrors: '[{ "id": "nexus", "mirrorOf": "!my-org-snapshots,*", "url": "http://redacted/nexus/content/groups/public" }]'
@@ -28,6 +29,16 @@ jobs:
           plugin_repositories: '[{"id": "foo-plugin", "url": "https://fu.bar.plugin"}]'
           profiles: '[{ "id": "foo.profile", "name": "foo.profile", "url": "http://foo.bar.profile", "properties": { "foo": "property-1", "bar": "property-2"} }]'
           plugin_groups: '[ "some.plugin.group.id", "some.other.plugin.group.id" ]'
+          active_profiles: 'foo.profile'
       - run: |
           cat ~/.m2/settings.xml
 
+  test-filepath:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - uses: ./
+        with:
+          output_file: '~/custom.xml'
+      - run: |
+          cat '~/custom.xml'
