@@ -2,7 +2,6 @@ var core = require('@actions/core');
 var path = require('path');
 var fs = require('fs');
 var DOMParser = require('xmldom').DOMParser;
-var XMLSerializer = require('xmldom').XMLSerializer;
 var format = require('xml-formatter');
 
 function getSettingsTemplate() {
@@ -21,17 +20,6 @@ function getTemplate(filepath, filename) {
     var templatePath = path.join(__dirname, filepath, filename);
     var template = fs.readFileSync(templatePath).toString();
     return new DOMParser().parseFromString(template, 'text/xml');
-}
-
-function formatSettings(templateXml) {
-    var settingStr = new XMLSerializer().serializeToString(templateXml);
-
-    // format xml to standard format
-    return format(settingStr, {
-        indentation: '  ',
-        collapsetent: true,
-        lineSeparator: '\n'
-    });
 }
 
 function update(templateXml) { 
@@ -62,7 +50,7 @@ function updateActiveProfiles(templateXml) {
 
     // apply custom repostories
     activeProfiles.forEach((activeProfileInput) => {
-        activeProfileXml = templateXml.createElement("activeProfile");
+        var activeProfileXml = templateXml.createElement("activeProfile");
         activeProfileXml.textContent = activeProfileInput;
         templateXml
             .getElementsByTagName('activeProfiles')[0]
@@ -289,7 +277,6 @@ function objectToXml(obj) {
 module.exports = {
     getSettingsTemplate,
     getTemplate,
-    formatSettings,
     update,
     updateActiveProfiles,
     updateServers,
