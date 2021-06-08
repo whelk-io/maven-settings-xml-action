@@ -2,6 +2,7 @@ var core = require('@actions/core');
 var path = require('path');
 var fs = require('fs');
 var DOMParser = require('xmldom').DOMParser;
+var XMLSerializer = require('xmldom').XMLSerializer;
 var format = require('xml-formatter');
 
 function getSettingsTemplate() {
@@ -22,7 +23,18 @@ function getTemplate(filepath, filename) {
     return new DOMParser().parseFromString(template, 'text/xml');
 }
 
-function update(templateXml) { 
+function formatSettings(templateXml) {
+    var settingStr = new XMLSerializer().serializeToString(templateXml);
+
+    // format xml to standard format
+    return format(settingStr, {
+        indentation: '  ',
+        collapsetent: true,
+        lineSeparator: '\n'
+    });
+}
+
+function update(templateXml) {
     this.updateActiveProfiles(templateXml);
     this.updateServers(templateXml);
     this.updateMirrors(templateXml);
@@ -32,7 +44,7 @@ function update(templateXml) {
     this.updatePluginGroups(templateXml)
 }
 
-function updateActiveProfiles(templateXml) { 
+function updateActiveProfiles(templateXml) {
 
     var activeProfilesInput = core.getInput('active_profiles');
 
@@ -61,7 +73,7 @@ function updateActiveProfiles(templateXml) {
 
 function applyDefaultActiveProfile(templateXml) {
     var defaultActiveProfile = getDefaultActiveProfileTemplate();
-    
+
     templateXml
         .getElementsByTagName('activeProfiles')[0]
         .appendChild(defaultActiveProfile);
@@ -160,7 +172,7 @@ function updateRepositories(templateXml) {
 
 function applyDefaultRepository(templateXml) {
     var defaultRepositoryTemplate = getDefaultRepositoryTemplate();
-    
+
     templateXml
         .getElementsByTagName('profiles')[0]
         .getElementsByTagName('repositories')[0]
@@ -277,6 +289,7 @@ function objectToXml(obj) {
 module.exports = {
     getSettingsTemplate,
     getTemplate,
+    formatSettings,
     update,
     updateActiveProfiles,
     updateServers,

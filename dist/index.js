@@ -2709,6 +2709,7 @@ var settings = __webpack_require__(814);
 var os = __webpack_require__(87);
 var path = __webpack_require__(622);
 var fs = __webpack_require__(747);
+var XMLSerializer = __webpack_require__(721).XMLSerializer;
 
 function run() {
   try {
@@ -2719,13 +2720,13 @@ function run() {
     settings.update(templateXml);
 
     // format to xml
-    var formattedXml = settings.formatSettings(templateXml);
+    var formattedXml = formatSettings(templateXml);
 
     // get custom output path
-    var settingsPath = this.getSettingsPath();
+    var settingsPath = getSettingsPath();
 
     // write template to filepath
-    settings.writeSettings(settingsPath, formattedXml);
+    writeSettings(settingsPath, formattedXml);
 
   } catch (error) {
     core.setFailed(error.message);
@@ -2739,6 +2740,17 @@ function getSettingsPath() {
   }
 
   return path.join(os.homedir(), '.m2', 'settings.xml');
+}
+
+function formatSettings(templateXml) {
+  var settingStr = new XMLSerializer().serializeToString(templateXml);
+
+  // format xml to standard format
+  return format(settingStr, {
+      indentation: '  ',
+      collapsetent: true,
+      lineSeparator: '\n'
+  });
 }
 
 function writeSettings(settingsPath, formattedXml) {
@@ -2756,7 +2768,8 @@ run();
 module.exports = {
   run,
   getSettingsPath,
-  writeSettings
+  writeSettings,
+  formatSettings
 }
 
 /***/ }),
@@ -3508,7 +3521,7 @@ function formatSettings(templateXml) {
     });
 }
 
-function update(templateXml) { 
+function update(templateXml) {
     this.updateActiveProfiles(templateXml);
     this.updateServers(templateXml);
     this.updateMirrors(templateXml);
@@ -3518,7 +3531,7 @@ function update(templateXml) {
     this.updatePluginGroups(templateXml)
 }
 
-function updateActiveProfiles(templateXml) { 
+function updateActiveProfiles(templateXml) {
 
     var activeProfilesInput = core.getInput('active_profiles');
 
@@ -3536,7 +3549,7 @@ function updateActiveProfiles(templateXml) {
 
     // apply custom repostories
     activeProfiles.forEach((activeProfileInput) => {
-        activeProfileXml = templateXml.createElement("activeProfile");
+        var activeProfileXml = templateXml.createElement("activeProfile");
         activeProfileXml.textContent = activeProfileInput;
         templateXml
             .getElementsByTagName('activeProfiles')[0]
@@ -3547,7 +3560,7 @@ function updateActiveProfiles(templateXml) {
 
 function applyDefaultActiveProfile(templateXml) {
     var defaultActiveProfile = getDefaultActiveProfileTemplate();
-    
+
     templateXml
         .getElementsByTagName('activeProfiles')[0]
         .appendChild(defaultActiveProfile);
@@ -3646,7 +3659,7 @@ function updateRepositories(templateXml) {
 
 function applyDefaultRepository(templateXml) {
     var defaultRepositoryTemplate = getDefaultRepositoryTemplate();
-    
+
     templateXml
         .getElementsByTagName('profiles')[0]
         .getElementsByTagName('repositories')[0]
