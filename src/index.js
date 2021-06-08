@@ -2,6 +2,7 @@ var core = require('@actions/core');
 var settings = require('./settings');
 var os = require('os');
 var path = require('path');
+var fs = require('fs');
 
 function run() {
   try {
@@ -34,12 +35,12 @@ function getSettingsPath() {
   return path.join(os.homedir(), '.m2', 'settings.xml');
 }
 
-function writeSettings(settingsPath, templateXml) {
+function writeSettings(settingsPath, formattedXml) {
   if (!fs.existsSync(path.dirname(settingsPath))) {
       core.info("creating directory for settings.xml: " + settingsPath);
       fs.mkdirSync(path.dirname(settingsPath));
   }
-  
+
   core.info("writing settings.xml to path: " + settingsPath)
   fs.writeFileSync(settingsPath, formattedXml);
 }
@@ -47,5 +48,7 @@ function writeSettings(settingsPath, templateXml) {
 run();
 
 module.exports = {
-  run
+  run,
+  getSettingsPath,
+  writeSettings
 }
