@@ -87,7 +87,9 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
 
 ### `output_file`
 
-Target path to generate `settings.xml`. By default, `/home/runner/.m2/settings.xml` is used. If using a custom path, the `--settings` parameter must be configured on `mvn`. For example: `mvn --settings /home/runner/.m2/custom.xml test`.
+Target path to generate `settings.xml`. By default, `.m2/settings.xml` is used. This path is in relation to the home directory `/home/runner/`. For example, the default file generated is `/home/runner/.m2/settings.xml`.
+
+If using a custom path, the `--settings` parameter must be configured on `mvn`. For example: `mvn --settings /home/runner/.m2/custom.xml test`.
 
 ---
 
@@ -223,7 +225,7 @@ Target path to generate `settings.xml`. By default, `/home/runner/.m2/settings.x
       [ 
         "some-profile"
       ]
-    output_file: [ "/home/runner/.m2/settings.xml" ]
+    output_file: [ ".m2/settings.xml" ]
 ````
 
 **Output**

@@ -29,7 +29,7 @@ function run() {
 function getSettingsPath() {
   var outputPath = core.getInput('output_file');
   if (outputPath != null && outputPath.trim() != '') {
-    return path.join(outputPath);
+    return path.join(os.homedir(), outputPath);
   }
 
   return path.join(os.homedir(), '.m2', 'settings.xml');
