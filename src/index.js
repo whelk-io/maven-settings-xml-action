@@ -3,6 +3,7 @@ var settings = require('./settings');
 var os = require('os');
 var path = require('path');
 var fs = require('fs');
+var XMLSerializer = require('xmldom').XMLSerializer;
 
 function run() {
   try {
@@ -13,13 +14,13 @@ function run() {
     settings.update(templateXml);
 
     // format to xml
-    var formattedXml = settings.formatSettings(templateXml);
+    var formattedXml = formatSettings(templateXml);
 
     // get custom output path
-    var settingsPath = this.getSettingsPath();
+    var settingsPath = getSettingsPath();
 
     // write template to filepath
-    settings.writeSettings(settingsPath, formattedXml);
+    writeSettings(settingsPath, formattedXml);
 
   } catch (error) {
     core.setFailed(error.message);
@@ -33,6 +34,17 @@ function getSettingsPath() {
   }
 
   return path.join(os.homedir(), '.m2', 'settings.xml');
+}
+
+function formatSettings(templateXml) {
+  var settingStr = new XMLSerializer().serializeToString(templateXml);
+
+  // format xml to standard format
+  return format(settingStr, {
+      indentation: '  ',
+      collapsetent: true,
+      lineSeparator: '\n'
+  });
 }
 
 function writeSettings(settingsPath, formattedXml) {
@@ -50,5 +62,6 @@ run();
 module.exports = {
   run,
   getSettingsPath,
-  writeSettings
+  writeSettings,
+  formatSettings
 }
