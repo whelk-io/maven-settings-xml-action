@@ -34,18 +34,6 @@ function formatSettings(templateXml) {
     });
 }
 
-function writeSettings(settingsPath, templateXml) {
-    if (!fs.existsSync(path.dirname(settingsPath))) {
-        core.info("creating ~/.m2 directory");
-        fs.mkdirSync(path.dirname(settingsPath));
-    }
-
-    var formattedXml = formatSettings(templateXml);
-
-    core.info("writing settings.xml to path: " + settingsPath)
-    fs.writeFileSync(settingsPath, formattedXml);
-}
-
 function update(templateXml) { 
     this.updateActiveProfiles(templateXml);
     this.updateServers(templateXml);
@@ -302,7 +290,6 @@ module.exports = {
     getSettingsTemplate,
     getTemplate,
     formatSettings,
-    writeSettings,
     update,
     updateActiveProfiles,
     updateServers,
