@@ -4,7 +4,7 @@
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
-Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<mirrors>`, and `<profiles>`.
+Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<pluginGroups>`, `<mirrors>`, `<activeProfiles>`, and `<profiles>`.
 
 ## Inputs
 
@@ -78,13 +78,16 @@ The `profile` element in the `settings.xml` is a truncated version of the `pom.x
 
 Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
 
-
-### `activeProfiles`
+### `active_profiles`
 **Optional** json array of active profiles to add to settings.xml
 
 Set of `activeProfile` elements, which each have a value of a `profile` `id`. Any `profile` `id` defined as an `activeProfile` will be active, regardless of any environment settings. If no matching profile is found nothing will happen. For example, if `env-test` is an `activeProfile`, a profile in a `pom.xml` (or `profile.xml`) with a corresponding `id` will be active. If no such profile is found then execution will continue as normal.
 
 Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.html#Active_Profiles)
+
+### `output_file`
+
+Target path to generate `settings.xml`. By default, `~/.m2/settings.xml` is used. If using a custom path, the `--settings` parameter must be configured on `mvn`. For example: `mvn --settings ~/my/custom.xml test`
 
 ---
 
@@ -92,7 +95,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v17
+  uses: whelk-io/maven-settings-xml-action@v18
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
@@ -146,7 +149,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v17
+  uses: whelk-io/maven-settings-xml-action@v18
   with:
     repositories: |
       [
