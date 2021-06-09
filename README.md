@@ -159,8 +159,8 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
 - name: maven-settings-xml-action
   uses: whelk-io/maven-settings-xml-action@v18
   with:
-    repositories: |
-      '[
+    repositories: >
+      [
         {
           "id": "some-repository",
           "name": "some-repository-name",
@@ -172,9 +172,9 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             "enabled": "false"
           }
         }
-      ]'
-    plugin_repositories: |
-      '[
+      ]
+    plugin_repositories: >
+      [
         {
           "id": "some-plugin-repository",
           "name": "some-plugin-repository-name",
@@ -186,9 +186,9 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             "enabled": "false"
           }
         }
-      ]'
-    servers: |
-      '[
+      ]
+    servers: >
+      [
         {
           "id": "some-id",
           "username": "${env.USER}",
@@ -201,17 +201,17 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             }
           }
         }
-      ]'
-    mirrors: |
-      '[
+      ]
+    mirrors: >
+      [
         {
           "id": "nexus",
           "mirrorOf": "!my-org-snapshots,*",
           "url": "http://redacted/nexus/content/groups/public"
         }
-      ]'
-    profiles: |
-      '[
+      ]
+    profiles: >
+      [
         {
           "id": "foo.profile",
           "name": "foo.profile",
@@ -221,17 +221,17 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             "bar": "property-2"
           }
         }
-      ]'
-    plugin_groups: |
-      '[ 
-        "some.plugin.group.id", 
+      ]
+    plugin_groups: >
+      [
+        "some.plugin.group.id",
         "some.other.plugin.group.id"
-      ]'
-    active_profiles: |
-      '[ 
+      ]
+    active_profiles: >
+      [
         "some-profile"
-      ]'
-    output_file: '[ ".m2/settings.xml" ]'
+      ]
+    output_file: .m2/settings.xml
 ````
 
 **Output**
@@ -343,3 +343,16 @@ See [CONTRIBUTING.md](Contributing) for guidelines for forking and contributing 
 **Create Distribution**
 
 `npm run build`
+
+
+## Run Actions Locally
+
+**Install [`Act`](https://github.com/nektos/act)**
+
+`brew install act`
+
+**Run Step**
+
+`act -s GITHUB_TOKEN={token} -j {step}`
+
+Example: `act -s GITHUB_TOKEN=lk34j56lk34j5lk34j5dkllsldf -j test-basic`

@@ -181,6 +181,7 @@ web_modules/
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+.vscode/
 
 # yarn v2
 
@@ -189,3 +190,5 @@ web_modules/
 .yarn/build-state.yml
 .pnp.*
 .idea
+
+

@@ -2738,9 +2738,8 @@ function getSettingsPath() {
     return getDefaultSettingsPath();
   }
 
-  var outputFile = JSON.parse(outputFileInput);
-  if (outputFile != null && outputFile[0] != null && outputFile[0].trim() != '') {
-    return path.join(os.homedir(), outputFile[0].trim());
+  if (outputFileInput.trim() != '') {
+    return path.join(os.homedir(), outputFileInput.trim());
   }
 
   return getDefaultSettingsPath();

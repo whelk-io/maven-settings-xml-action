@@ -25,7 +25,7 @@ inputs:
   active_profiles:
     description: 'json array of profile ids to add to settings.xml'
   output_file:
-    description: 'path to generated file, default is ~/.m2/settings.xml'
+    description: 'path to generated file, default is .m2/settings.xml'
 runs:
   using: 'node12'
   main: 'dist/index.js'
