@@ -2733,11 +2733,20 @@ function run() {
 }
 
 function getSettingsPath() {
-  var outputPath = core.getInput('output_file');
-  if (outputPath != null && outputPath[0] != null && outputPath[0].trim() != '') {
-    return path.join(os.homedir(), outputPath[0].trim());
+  var outputFileInput = core.getInput('output_file');
+  if (!outputFileInput) {
+    return getDefaultSettingsPath();
   }
 
+  var outputFile = JSON.parse(outputFileInput);
+  if (outputFile != null && outputFile[0] != null && outputFile[0].trim() != '') {
+    return path.join(os.homedir(), outputFile[0].trim());
+  }
+
+  return getDefaultSettingsPath();
+}
+
+function getDefaultSettingsPath() { 
   return path.join(os.homedir(), '.m2', 'settings.xml');
 }
 
@@ -2756,6 +2765,7 @@ run();
 module.exports = {
   run,
   getSettingsPath,
+  getDefaultSettingsPath,
   writeSettings
 }
 
