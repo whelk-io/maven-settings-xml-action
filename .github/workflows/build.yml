@@ -40,19 +40,7 @@ jobs:
       - uses: ./
         with:
           repositories: |
-            '[
-              {
-                "id": "some-repository",
-                "name": "some-repository-name",
-                "url": "http://some.repository.url",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "false"
-                }
-              }
-            ]'
+            '[{"id": "foo", "url": "https://fu.bar"}]'
       - run: |
           cat ~/.m2/settings.xml
 
