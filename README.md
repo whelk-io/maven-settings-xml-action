@@ -92,7 +92,7 @@ When using a custom `output_file`, for example:
 ```yaml
 - uses: whelk-io/maven-settings-xml-action@v18
   with:
-    output_file: [ "foo/custom.xml" ]
+    output_file: `[ "foo/custom.xml" ]`
 ```
 
 The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, which can be referenced in maven steps using `mvn --settings /home/runner/foo/custom.xml <goal>`.
@@ -160,7 +160,7 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
   uses: whelk-io/maven-settings-xml-action@v18
   with:
     repositories: |
-      [
+      '[
         {
           "id": "some-repository",
           "name": "some-repository-name",
@@ -172,9 +172,9 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             "enabled": "false"
           }
         }
-      ]
+      ]'
     plugin_repositories: |
-      [
+      '[
         {
           "id": "some-plugin-repository",
           "name": "some-plugin-repository-name",
@@ -186,9 +186,9 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             "enabled": "false"
           }
         }
-      ]
+      ]'
     servers: |
-      [
+      '[
         {
           "id": "some-id",
           "username": "${env.USER}",
@@ -201,17 +201,17 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             }
           }
         }
-      ]
+      ]'
     mirrors: |
-      [
+      '[
         {
           "id": "nexus",
           "mirrorOf": "!my-org-snapshots,*",
           "url": "http://redacted/nexus/content/groups/public"
         }
-      ]
+      ]'
     profiles: |
-      [
+      '[
         {
           "id": "foo.profile",
           "name": "foo.profile",
@@ -221,17 +221,17 @@ The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, w
             "bar": "property-2"
           }
         }
-      ]
+      ]'
     plugin_groups: |
-      [ 
+      '[ 
         "some.plugin.group.id", 
         "some.other.plugin.group.id"
-      ]
+      ]'
     active_profiles: |
-      [ 
+      '[ 
         "some-profile"
-      ]
-    output_file: [ ".m2/settings.xml" ]
+      ]'
+    output_file: '[ ".m2/settings.xml" ]'
 ````
 
 **Output**
