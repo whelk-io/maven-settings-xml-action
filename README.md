@@ -86,10 +86,16 @@ Set of `activeProfile` elements, which each have a value of a `profile` `id`. An
 Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.html#Active_Profiles)
 
 ### `output_file`
+**Optional** json array of strings for the output file. Any value provided will be in relation to the home (`/home/runner`) directory. By default `[ ".m2/settings.xml" ]` is used to generate `/home/runner/.m2/settings.xml`.
 
-Target path to generate `settings.xml`. By default, `.m2/settings.xml` is used. This path is in relation to the home directory `/home/runner/`. For example, the default file generated is `/home/runner/.m2/settings.xml`.
+When using a custom `output_file`, for example:
+```yaml
+- uses: whelk-io/maven-settings-xml-action@v18
+  with:
+    output_file: [ "foo/custom.xml" ]
+```
 
-If using a custom path, the `--settings` parameter must be configured on `mvn`. For example: `mvn --settings /home/runner/.m2/custom.xml test`.
+The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, which can be referenced in maven steps using `mvn --settings /home/runner/foo/custom.xml <goal>`.
 
 ---
 
