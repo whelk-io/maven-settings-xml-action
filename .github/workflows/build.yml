@@ -33,7 +33,7 @@ jobs:
       - run: |
           cat ~/.m2/settings.xml
 
-  test-expanded: 
+  test-expanded:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.3.4
@@ -103,16 +103,16 @@ jobs:
               }
             ]'
           plugin_groups: |
-            '[ 
-              "some.plugin.group.id", 
+            '[
+              "some.plugin.group.id",
               "some.other.plugin.group.id"
             ]'
           active_profiles: |
-            '[ 
+            '[
               "some-profile"
             ]'
           output_file: '[ ".m2/settings.xml" ]'
-    
+
   test-filepath:
     runs-on: ubuntu-latest
     steps:
