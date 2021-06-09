@@ -53,65 +53,8 @@ jobs:
                 }
               }
             ]'
-          plugin_repositories: |
-            '[
-              {
-                "id": "some-plugin-repository",
-                "name": "some-plugin-repository-name",
-                "url": "http://some.plugin.repository.url",
-                "releases": {
-                  "enabled": "true"
-                },
-                "snapshots": {
-                  "enabled": "false"
-                }
-              }
-            ]'
-          servers: |
-            '[
-              {
-                "id": "some-id",
-                "username": "${env.USER}",
-                "password": "${env.PASS}",
-                "configuration": {
-                  "httpConfiguration": {
-                    "all": {
-                      "usePreemptive": "true"
-                    }
-                  }
-                }
-              }
-            ]'
-          mirrors: |
-            '[
-              {
-                "id": "nexus",
-                "mirrorOf": "!my-org-snapshots,*",
-                "url": "http://redacted/nexus/content/groups/public"
-              }
-            ]'
-          profiles: |
-            '[
-              {
-                "id": "foo.profile",
-                "name": "foo.profile",
-                "url": "http://foo.bar.profile",
-                "properties": {
-                  "foo": "property-1",
-                  "bar": "property-2"
-                }
-              }
-            ]'
-          plugin_groups: |
-            '[
-              "some.plugin.group.id",
-              "some.other.plugin.group.id"
-            ]'
-          active_profiles: |
-            '[
-              "some-profile"
-            ]'
-          output_file: '[ ".m2/settings.xml" ]'
+      - run: |
+          cat ~/.m2/settings.xml
 
   test-filepath:
     runs-on: ubuntu-latest
