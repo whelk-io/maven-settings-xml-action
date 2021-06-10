@@ -124,3 +124,14 @@ jobs:
           output_file: custom.xml
       - run: |
           cat ~/custom.xml
+
+  test-env-filepath:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - uses: ./
+        with:
+          output_file: ${{ env.GITHUB_WORKSPACE }}/custom.xml
+      - run: |
+          echo ${{ env.GITHUB_WORKSPACE }};
+          cat ${{ env.GITHUB_WORKSPACE }}/custom.xml

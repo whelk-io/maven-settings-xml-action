@@ -17,7 +17,7 @@ function run() {
 
     // get custom output path
     var settingsPath = getSettingsPath();
-
+ 
     // write template to filepath
     writeSettings(settingsPath, formattedXml);
 
@@ -33,7 +33,7 @@ function getSettingsPath() {
   }
 
   if (outputFileInput.trim() != '') {
-    return path.join(os.homedir(), outputFileInput.trim());
+    return path.join(outputFileInput.trim());
   }
 
   return getDefaultSettingsPath();
