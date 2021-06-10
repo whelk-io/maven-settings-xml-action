@@ -138,4 +138,6 @@ jobs:
         with:
           java-version: 11
       - run: |
+          ls -la;
+          pwd;
           ./mvnw -s ~/custom.xml clean test
