@@ -3,6 +3,7 @@ var settings = require('./settings');
 var os = require('os');
 var path = require('path');
 var fs = require('fs');
+var github = require('@actions/github');
 
 function run() {
   try {
@@ -28,12 +29,14 @@ function run() {
 
 function getSettingsPath() {
   var outputFileInput = core.getInput('output_file');
+
   if (!outputFileInput) {
     return getDefaultSettingsPath();
   }
 
+  // resolve env variables in path
   if (outputFileInput.trim() != '') {
-    return path.join(outputFileInput.trim());
+    return outputFileInput.trim().replace(/\$([A-Z_]+[A-Z0-9_]*)|\${([A-Z0-9_]*)}/ig, (_, a, b) => process.env[a || b])
   }
 
   return getDefaultSettingsPath();

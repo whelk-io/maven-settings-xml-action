@@ -143,13 +143,13 @@ jobs:
 
   test-env-filepath:
     runs-on: ubuntu-latest
-    env: 
-      GITHUB_WORKSPACE: foo
+    env:
+      SETTINGS_XML: $GITHUB_WORKSPACE/custom.xml;
     steps:
       - uses: actions/checkout@v2.3.4
       - uses: ./
         with:
-          output_file: ${{ env.GITHUB_WORKSPACE }}/custom.xml
+          output_file: $GITHUB_WORKSPACE/custom.xml
       - run: |
           cat $GITHUB_WORKSPACE/custom.xml
       - uses: actions/setup-java@v1.4.3
