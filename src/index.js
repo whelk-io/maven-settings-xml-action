@@ -30,11 +30,8 @@ function run() {
 function getSettingsPath() {
   var outputFileInput = core.getInput('output_file');
   console.log(outputFileInput); // TODO remove
-  var replaced = outputFileInput.replace(/%([^%]+)%/g, (_,n) => process.env[n])
+  var replaced = outputFileInput.replace(/$([^$]+)$/g, (_,n) => process.env[n])
   console.log(replaced);
-  const payload = JSON.stringify(github.context.payload, undefined, 2);
-  console.log(`here ${outputFileInput}!`);
-  console.log(`The event payload: ${payload}`);
 
   if (!outputFileInput) {
     return getDefaultSettingsPath();
