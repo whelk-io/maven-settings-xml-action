@@ -3,6 +3,7 @@ var settings = require('./settings');
 var os = require('os');
 var path = require('path');
 var fs = require('fs');
+var github = require('@actions/github');
 
 function run() {
   try {
@@ -31,6 +32,9 @@ function getSettingsPath() {
   console.log(outputFileInput); // TODO remove
   var replaced = outputFileInput.replace(/%([^%]+)%/g, (_,n) => process.env[n])
   console.log(replaced);
+  const payload = JSON.stringify(github.context.payload, undefined, 2);
+  console.log(`here ${outputFileInput}!`);
+  console.log(`The event payload: ${payload}`);
 
   if (!outputFileInput) {
     return getDefaultSettingsPath();
