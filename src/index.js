@@ -29,18 +29,14 @@ function run() {
 
 function getSettingsPath() {
   var outputFileInput = core.getInput('output_file');
-  console.log(outputFileInput); // TODO remove
-  console.log(process.env.GITHUB_WORKSPACE)
-  var replaced = outputFileInput.replace(/\$([A-Z_]+[A-Z0-9_]*)|\${([A-Z0-9_]*)}/ig, (_, a, b) => process.env[a || b])
-
-  console.log(replaced);
 
   if (!outputFileInput) {
     return getDefaultSettingsPath();
   }
 
   if (outputFileInput.trim() != '') {
-    return path.join(outputFileInput.trim());
+    return outputFileInput.trim().replace(/\$([A-Z_]+[A-Z0-9_]*)|\${([A-Z0-9_]*)}/ig, (_, a, b) => process.env[a || b])
+    // return path.join(outputFileInput.trim());
   }
 
   return getDefaultSettingsPath();
