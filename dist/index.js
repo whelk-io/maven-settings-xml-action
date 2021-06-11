@@ -6667,7 +6667,7 @@ function writeSettings(settingsPath, formattedXml) {
       fs.mkdirSync(path.dirname(settingsPath));
   }
 
-  core.info("writing settings.xml to path: " + settingsPath)
+  core.info("writing settings.xml to path: " + path.resolve(settingsPath));
   fs.writeFileSync(settingsPath, formattedXml);
 }
 
