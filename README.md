@@ -95,7 +95,7 @@ When using a custom `output_file`, for example:
     output_file: foo/custom.xml
 ```
 
-The generated `settings.xml` will be created at `/home/runner/foo/custom.xml`, which can be referenced in maven steps using `mvn --settings /home/runner/foo/custom.xml <goal>`.
+The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/custom.xml`, which can be referenced in maven steps using `mvn --settings foo/custom.xml {goal}`.
 
 ---
 

@@ -1,6 +1,6 @@
 var assert = require('assert');
 var process = require('process');
-var settings = require('../src/settings')
+var settings = require('../../src/settings')
 
 describe('validate plugin groups', function () {
 
@@ -15,7 +15,7 @@ describe('validate plugin groups', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-plugin-groups-present.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-plugin-groups-present.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 

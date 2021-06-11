@@ -1,6 +1,6 @@
 var assert = require('assert');
 var process = require('process');
-var settings = require('../src/settings')
+var settings = require('../../src/settings')
 
 describe('validate profiles', function () {
 
@@ -15,7 +15,7 @@ describe('validate profiles', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-profiles-present.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-profiles-present.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
