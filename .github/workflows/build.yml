@@ -134,11 +134,11 @@ jobs:
       - run: |
           echo $GITHUB_WORKSPACE;
           echo $SETTINGS_XML;
-      - run: echo "GITHUB_WORKSPACE_SHORT=$(echo $GITHUB_WORKSPACE | cut -c 1-6)" >> $GITHUB_ENV
+      - run: echo "GITHUB_WORKSPACE_SHORT=$(echo $GITHUB_WORKSPACE)" >> $GITHUB_ENV
       - run: echo $GITHUB_WORKSPACE_SHORT
       - uses: ./
         with:
-          output_file: '${{ env.GITHUB_WORKSPACE }}/custom.xml'
+          output_file: '$GITHUB_WORKSPACE_SHORT/custom.xml'
       - run: |
-          ls -la $GITHUB_WORKSPACE;
-          cat $GITHUB_WORKSPACE/custom.xml;
+          ls -la $GITHUB_WORKSPACE_SHORT;
+          cat $GITHUB_WORKSPACE_SHORT/custom.xml;
