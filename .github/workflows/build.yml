@@ -143,8 +143,6 @@ jobs:
 
   test-env-filepath:
     runs-on: ubuntu-latest
-    env:
-      SETTINGS_XML: $GITHUB_WORKSPACE/custom.xml;
     steps:
       - uses: actions/checkout@v2.3.4
       - uses: ./
