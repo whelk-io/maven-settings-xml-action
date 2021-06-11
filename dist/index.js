@@ -2709,6 +2709,7 @@ var settings = __webpack_require__(814);
 var os = __webpack_require__(87);
 var path = __webpack_require__(622);
 var fs = __webpack_require__(747);
+var github = __webpack_require__(690);
 
 function run() {
   try {
@@ -2737,6 +2738,9 @@ function getSettingsPath() {
   console.log(outputFileInput); // TODO remove
   var replaced = outputFileInput.replace(/%([^%]+)%/g, (_,n) => process.env[n])
   console.log(replaced);
+  const payload = JSON.stringify(github.context.payload, undefined, 2);
+  console.log(`here ${outputFileInput}!`);
+  console.log(`The event payload: ${payload}`);
 
   if (!outputFileInput) {
     return getDefaultSettingsPath();
@@ -2771,6 +2775,14 @@ module.exports = {
   getDefaultSettingsPath,
   writeSettings
 }
+
+/***/ }),
+
+/***/ 690:
+/***/ (function() {
+
+eval("require")("@actions/github");
+
 
 /***/ }),
 
