@@ -6645,6 +6645,7 @@ function run() {
 function getSettingsPath() {
   var outputFileInput = core.getInput('output_file');
   console.log(outputFileInput); // TODO remove
+  console.log(process.env.GITHUB_WORKSPACE_SHORT)
   var replaced = outputFileInput.replace(/$([^$]+)$/g, (_,n) => process.env[n])
   console.log(replaced);
 
