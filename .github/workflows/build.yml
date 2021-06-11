@@ -131,14 +131,8 @@ jobs:
       SETTINGS_XML: $GITHUB_WORKSPACE/custom.xml;
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: |
-          echo $GITHUB_WORKSPACE;
-          echo $SETTINGS_XML;
-      - run: echo "GITHUB_WORKSPACE_SHORT=$(echo $GITHUB_WORKSPACE)" >> $GITHUB_ENV
-      - run: echo $GITHUB_WORKSPACE_SHORT
       - uses: ./
         with:
           output_file: $GITHUB_WORKSPACE/custom.xml
       - run: |
-          ls -la $GITHUB_WORKSPACE;
           cat $GITHUB_WORKSPACE/custom.xml;
