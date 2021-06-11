@@ -133,7 +133,7 @@ jobs:
           echo $GITHUB_WORKSPACE;
       - uses: ./
         env: 
-          CUSTOM_PATH: ${{ env.GITHUB_WORKSPACE }}
+          CUSTOM_PATH: /home/runner/foo
         with:
           output_file: $CUSTOM_PATH/custom.xml
       - run: |
