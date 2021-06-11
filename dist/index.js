@@ -2734,6 +2734,8 @@ function run() {
 
 function getSettingsPath() {
   var outputFileInput = core.getInput('output_file');
+  console.log(outputFileInput); // TODO remove
+  
   if (!outputFileInput) {
     return getDefaultSettingsPath();
   }
