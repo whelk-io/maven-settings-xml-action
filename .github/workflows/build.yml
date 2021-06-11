@@ -139,7 +139,7 @@ jobs:
           java-version: 11
       - run: |
           cd test/maven;
-          ./mvnw -s ~/custom.xml clean test
+          ./mvnw -s custom.xml clean test
 
   test-env-filepath:
     runs-on: ubuntu-latest
