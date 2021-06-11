@@ -133,7 +133,7 @@ jobs:
         with:
           output_file: custom.xml
       - run: |
-          cat ~/custom.xml
+          cat custom.xml
       - uses: actions/setup-java@v1.4.3
         with:
           java-version: 11
