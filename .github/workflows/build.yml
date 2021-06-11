@@ -127,13 +127,13 @@ jobs:
 
   test-env-filepath:
     runs-on: ubuntu-latest
+    env: 
+      CUSTOM_PATH: /home/runner/foo
     steps:
       - uses: actions/checkout@v2.3.4
       - run: |
           echo $GITHUB_WORKSPACE;
       - uses: ./
-        env: 
-          CUSTOM_PATH: /home/runner/foo
         with:
           output_file: $CUSTOM_PATH/custom.xml
       - run: |
