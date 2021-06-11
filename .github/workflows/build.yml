@@ -127,8 +127,6 @@ jobs:
 
   test-env-filepath:
     runs-on: ubuntu-latest
-    env: 
-      GITHUB_WORKSPACE: foo
     steps:
       - uses: actions/checkout@v2.3.4
       - uses: ./
