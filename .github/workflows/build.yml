@@ -138,7 +138,7 @@ jobs:
       - run: echo $GITHUB_WORKSPACE_SHORT
       - uses: ./
         with:
-          output_file: $GITHUB_WORKSPACE_SHORT/custom.xml
+          output_file: $GITHUB_WORKSPACE/custom.xml
       - run: |
-          ls -la $GITHUB_WORKSPACE_SHORT;
-          cat $GITHUB_WORKSPACE_SHORT/custom.xml;
+          ls -la $GITHUB_WORKSPACE;
+          cat $GITHUB_WORKSPACE/custom.xml;
