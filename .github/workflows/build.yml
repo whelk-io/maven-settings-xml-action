@@ -125,6 +125,22 @@ jobs:
       - run: |
           cat custom.xml
 
+  test-maven:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - uses: ./
+        with:
+          output_file: custom.xml
+      - run: |
+          cat ~/custom.xml
+      - uses: actions/setup-java@v1.4.3
+        with:
+          java-version: 11
+      - run: |
+          cd test/maven;
+          ./mvnw -s ~/custom.xml clean test
+
   test-env-filepath:
     runs-on: ubuntu-latest
     env: 
@@ -136,4 +152,9 @@ jobs:
           output_file: ${{ env.GITHUB_WORKSPACE }}/custom.xml
       - run: |
           cat $GITHUB_WORKSPACE/custom.xml
-
+      - uses: actions/setup-java@v1.4.3
+        with:
+          java-version: 11
+      - run: |
+          cd test/maven;
+          ./mvnw -s $GITHUB_WORKSPACE/custom.xml clean test
