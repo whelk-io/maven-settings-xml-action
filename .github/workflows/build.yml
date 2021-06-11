@@ -137,7 +137,7 @@ jobs:
           echo $SETTINGS_XML;
       - uses: ./
         with:
-          output_file: ${{ env.GITHUB_WORKSPACE }}/custom.xml
+          output_file: '${{ env.GITHUB_WORKSPACE }}/custom.xml'
       - run: |
           ls -la $GITHUB_WORKSPACE;
           cat $GITHUB_WORKSPACE/custom.xml;
