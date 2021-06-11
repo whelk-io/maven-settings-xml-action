@@ -135,4 +135,5 @@ jobs:
         with:
           output_file: ${{ env.GITHUB_WORKSPACE }}/custom.xml
       - run: |
+          echo $GITHUB_WORKSPACE;
           cat $GITHUB_WORKSPACE/custom.xml
