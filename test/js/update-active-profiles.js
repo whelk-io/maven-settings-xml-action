@@ -1,6 +1,6 @@
 var assert = require('assert');
 var process = require('process');
-var settings = require('../src/settings')
+var settings = require('../../src/settings')
 
 describe('validate active profiles', function () {
 
@@ -15,7 +15,7 @@ describe('validate active profiles', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-active-profiles-present.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-active-profiles-present.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -34,7 +34,7 @@ describe('validate active profiles', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-active-profiles-empty.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-active-profiles-empty.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -53,7 +53,7 @@ describe('validate active profiles', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-active-profiles-missing.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-active-profiles-missing.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
