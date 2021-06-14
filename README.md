@@ -1,10 +1,10 @@
 # maven-settings-xml-action
 
-[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) ![build-test](https://github.com/whelk-io/maven-settings-xml-action/workflows/build-test/badge.svg)
+[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) ![build-test](https://github.com/whelk-io/maven-settings-xml-action/workflows/build-test/badge.svg) [![CodeQL](https://github.com/whelk-io/maven-settings-xml-action/actions/workflows/codeql-analysis.yml/badge.svg?branch=main)](https://github.com/whelk-io/maven-settings-xml-action/actions/workflows/codeql-analysis.yml)
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
-Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<mirrors>`, and `<profiles>`.
+Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<pluginGroups>`, `<mirrors>`, `<activeProfiles>`, and `<profiles>`.
 
 ## Inputs
 
@@ -78,13 +78,24 @@ The `profile` element in the `settings.xml` is a truncated version of the `pom.x
 
 Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#profiles)
 
-
-### `activeProfiles`
+### `active_profiles`
 **Optional** json array of active profiles to add to settings.xml
 
 Set of `activeProfile` elements, which each have a value of a `profile` `id`. Any `profile` `id` defined as an `activeProfile` will be active, regardless of any environment settings. If no matching profile is found nothing will happen. For example, if `env-test` is an `activeProfile`, a profile in a `pom.xml` (or `profile.xml`) with a corresponding `id` will be active. If no such profile is found then execution will continue as normal.
 
 Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.html#Active_Profiles)
+
+### `output_file`
+**Optional** String path of to generate `settings.xml`. By default, `~/.m2/settings.xml` is used. 
+
+When using a custom `output_file`, for example:
+```yaml
+- uses: whelk-io/maven-settings-xml-action@v18
+  with:
+    output_file: foo/custom.xml
+```
+
+The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/custom.xml`, which can be referenced in maven steps using `mvn --settings foo/custom.xml {goal}`.
 
 ---
 
@@ -92,7 +103,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v17
+  uses: whelk-io/maven-settings-xml-action@v18
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
@@ -146,9 +157,9 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v17
+  uses: whelk-io/maven-settings-xml-action@v18
   with:
-    repositories: |
+    repositories: >
       [
         {
           "id": "some-repository",
@@ -162,7 +173,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
           }
         }
       ]
-    plugin_repositories: |
+    plugin_repositories: >
       [
         {
           "id": "some-plugin-repository",
@@ -176,7 +187,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
           }
         }
       ]
-    servers: |
+    servers: >
       [
         {
           "id": "some-id",
@@ -191,7 +202,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
           }
         }
       ]
-    mirrors: |
+    mirrors: >
       [
         {
           "id": "nexus",
@@ -199,7 +210,7 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
           "url": "http://redacted/nexus/content/groups/public"
         }
       ]
-    profiles: |
+    profiles: >
       [
         {
           "id": "foo.profile",
@@ -211,15 +222,16 @@ Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.
           }
         }
       ]
-    plugin_groups: |
-      [ 
-        "some.plugin.group.id", 
+    plugin_groups: >
+      [
+        "some.plugin.group.id",
         "some.other.plugin.group.id"
       ]
-    active_profiles: |
-      [ 
+    active_profiles: >
+      [
         "some-profile"
       ]
+    output_file: .m2/settings.xml
 ````
 
 **Output**
@@ -331,3 +343,16 @@ See [CONTRIBUTING.md](Contributing) for guidelines for forking and contributing 
 **Create Distribution**
 
 `npm run build`
+
+
+## Run Actions Locally
+
+**Install [`Act`](https://github.com/nektos/act)**
+
+`brew install act`
+
+**Run Step**
+
+`act -s GITHUB_TOKEN={token} -j {step}`
+
+Example: `act -s GITHUB_TOKEN=lk34j56lk34j5lk34j5dkllsldf -j test-basic`

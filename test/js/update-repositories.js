@@ -1,6 +1,6 @@
 var assert = require('assert');
 var process = require('process');
-var settings = require('../src/settings')
+var settings = require('../../src/settings')
 
 describe('validate repositories', function () {
 
@@ -15,7 +15,7 @@ describe('validate repositories', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-repositories-missing.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-repositories-missing.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -34,7 +34,7 @@ describe('validate repositories', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-repositories-missing.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-repositories-missing.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -54,7 +54,7 @@ describe('validate repositories', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-repositories-present.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-repositories-present.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 

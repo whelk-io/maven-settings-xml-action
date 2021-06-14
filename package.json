@@ -1,13 +1,14 @@
 {
   "name": "maven-settings-xml-action",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Update maven ~/.m2/settings.xml",
   "main": "src/index.js",
   "directories": {
-    "test": "test"
+    "test": "test/js"
   },
   "dependencies": {
     "@actions/core": "^1.3.0",
+    "@actions/github": "^5.0.0",
     "fs": "0.0.1-security",
     "os": "^0.1.1",
     "path": "^0.12.7",
@@ -23,7 +24,7 @@
   },
   "scripts": {
     "lint": "eslint ./src/*.js",
-    "test": "mocha",
+    "test": "mocha test/js",
     "build_index": "ncc build src/index.js -o dist ",
     "copy_templates": "rm -rf dist/template && mkdir dist/template && cp -a template/. dist/template/",
     "build": "npm run build_index && npm run copy_templates"

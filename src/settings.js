@@ -34,19 +34,7 @@ function formatSettings(templateXml) {
     });
 }
 
-function writeSettings(settingsPath, templateXml) {
-    if (!fs.existsSync(path.dirname(settingsPath))) {
-        core.info("creating ~/.m2 directory");
-        fs.mkdirSync(path.dirname(settingsPath));
-    }
-
-    var formattedXml = formatSettings(templateXml);
-
-    core.info("writing settings.xml to path: " + settingsPath)
-    fs.writeFileSync(settingsPath, formattedXml);
-}
-
-function update(templateXml) { 
+function update(templateXml) {
     this.updateActiveProfiles(templateXml);
     this.updateServers(templateXml);
     this.updateMirrors(templateXml);
@@ -56,7 +44,7 @@ function update(templateXml) {
     this.updatePluginGroups(templateXml)
 }
 
-function updateActiveProfiles(templateXml) { 
+function updateActiveProfiles(templateXml) {
 
     var activeProfilesInput = core.getInput('active_profiles');
 
@@ -74,7 +62,7 @@ function updateActiveProfiles(templateXml) {
 
     // apply custom repostories
     activeProfiles.forEach((activeProfileInput) => {
-        activeProfileXml = templateXml.createElement("activeProfile");
+        var activeProfileXml = templateXml.createElement("activeProfile");
         activeProfileXml.textContent = activeProfileInput;
         templateXml
             .getElementsByTagName('activeProfiles')[0]
@@ -85,7 +73,7 @@ function updateActiveProfiles(templateXml) {
 
 function applyDefaultActiveProfile(templateXml) {
     var defaultActiveProfile = getDefaultActiveProfileTemplate();
-    
+
     templateXml
         .getElementsByTagName('activeProfiles')[0]
         .appendChild(defaultActiveProfile);
@@ -184,7 +172,7 @@ function updateRepositories(templateXml) {
 
 function applyDefaultRepository(templateXml) {
     var defaultRepositoryTemplate = getDefaultRepositoryTemplate();
-    
+
     templateXml
         .getElementsByTagName('profiles')[0]
         .getElementsByTagName('repositories')[0]
@@ -302,7 +290,6 @@ module.exports = {
     getSettingsTemplate,
     getTemplate,
     formatSettings,
-    writeSettings,
     update,
     updateActiveProfiles,
     updateServers,

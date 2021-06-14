@@ -1,6 +1,6 @@
 var assert = require('assert');
 var process = require('process');
-var settings = require('../src/settings')
+var settings = require('../../src/settings')
 
 describe('validate servers', function () {
 
@@ -15,7 +15,7 @@ describe('validate servers', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-servers-missing.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-servers-missing.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -35,7 +35,7 @@ describe('validate servers', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-servers-present.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-servers-present.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -55,7 +55,7 @@ describe('validate servers', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-servers-with-extended-configuration.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-servers-with-extended-configuration.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
@@ -75,7 +75,27 @@ describe('validate servers', function () {
             var actual = settings.formatSettings(actualXml);
 
             // then
-            var expectedXml = settings.getTemplate('../test/resources/', 'when-servers-with-extended-properties.xml');
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-servers-with-extended-properties.xml');
+            expected = settings.formatSettings(expectedXml);
+            assert.equal(actual, expected);
+
+            // tear down
+            process.env['INPUT_SERVERS'] = '';
+        });
+    });
+
+    describe('when environment variables are present', function () {
+        it('<server/> should be appended with <server> and include all environment variables', function () {
+            // given input
+            process.env['INPUT_SERVERS'] = '[{ "id": "foo", "username": "${env.USERNAME}", "password": "${env.PASSWORD}" }]';
+
+            // when
+            var actualXml = settings.getSettingsTemplate();
+            settings.update(actualXml);
+            var actual = settings.formatSettings(actualXml);
+
+            // then
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-servers-with-env-variables.xml');
             expected = settings.formatSettings(expectedXml);
             assert.equal(actual, expected);
 
