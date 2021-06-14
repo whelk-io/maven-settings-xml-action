@@ -1,6 +1,6 @@
 # maven-settings-xml-action
 
-[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) ![build-test](https://github.com/whelk-io/maven-settings-xml-action/workflows/build-test/badge.svg)
+[![CodeFactor](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action/badge)](https://www.codefactor.io/repository/github/whelk-io/maven-settings-xml-action) ![build-test](https://github.com/whelk-io/maven-settings-xml-action/workflows/build-test/badge.svg) [![CodeQL](https://github.com/whelk-io/maven-settings-xml-action/actions/workflows/codeql-analysis.yml/badge.svg?branch=main)](https://github.com/whelk-io/maven-settings-xml-action/actions/workflows/codeql-analysis.yml)
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
