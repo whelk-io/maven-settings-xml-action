@@ -137,9 +137,10 @@ jobs:
       - uses: actions/setup-java@v2.1.0
         with:
           java-version: 11
+          distribution: 'adopt'
       - run: |
           cd test/maven;
-          ./mvnw -s /home/runner/work/maven-settings-xml-action/maven-settings-xml-action/custom.xml clean test
+          ./mvnw -s ../../custom.xml clean test
 
   test-env-filepath:
     runs-on: ubuntu-latest
@@ -153,6 +154,7 @@ jobs:
       - uses: actions/setup-java@v2.1.0
         with:
           java-version: 11
+          distribution: 'adopt'
       - run: |
           cd test/maven;
           ./mvnw -s $GITHUB_WORKSPACE/custom.xml clean test
