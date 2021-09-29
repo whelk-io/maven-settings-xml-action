@@ -30,6 +30,8 @@
 
   <mirrors/>
 
-  <pluginGroups/>
+  <pluginGroups/> 
+ 
+  <proxies/>
 
 </settings>

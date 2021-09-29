@@ -3,7 +3,6 @@ var settings = require('./settings');
 var os = require('os');
 var path = require('path');
 var fs = require('fs');
-var github = require('@actions/github');
 
 function run() {
   try {
