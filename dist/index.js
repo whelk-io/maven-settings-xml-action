@@ -3527,6 +3527,7 @@ function update(templateXml) {
     this.updatePluginRepositories(templateXml);
     this.updateProfiles(templateXml)
     this.updatePluginGroups(templateXml)
+    this.updateProxies(templateXml)
 }
 
 function updateActiveProfiles(templateXml) {
@@ -3750,6 +3751,33 @@ function updatePluginGroups(templateXml) {
 
 }
 
+function updateProxies(templateXml) {
+    var proxiesInput = core.getInput('proxies');
+
+    if (!proxiesInput) {
+        return;
+    }
+
+    var proxiesXml = templateXml.getElementsByTagName('proxies')[0];
+
+    JSON.parse(proxiesInput).forEach((proxyInput) => {
+        var proxyXml = templateXml.createElement('proxy');
+        for (var key in proxyInput) {
+            var keyXml = templateXml.createElement(key);
+
+            // convert all json content as xml
+            var value = objectToXml(proxyInput[key]);
+            var xmlValue = new DOMParser().parseFromString(value, 'text/xml');
+
+            // append new xml to current node
+            keyXml.appendChild(xmlValue);
+            proxyXml.appendChild(keyXml);
+        }
+        proxiesXml.appendChild(proxyXml);
+    });
+
+}
+
 function objectToXml(obj) {
     var xml = '';
     for (var prop in obj) {
@@ -3782,7 +3810,8 @@ module.exports = {
     updateRepositories,
     updatePluginRepositories,
     updateProfiles,
-    updatePluginGroups
+    updatePluginGroups,
+    updateProxies
 }
 
 

@@ -28,16 +28,21 @@
 
     <servers/>
 
-    <mirrors>
-        <mirror>
-            <id>nexus</id>
-            <mirrorOf>!my-org-snapshots,*</mirrorOf>
-            <url>http://redacted/nexus/content/groups/public</url>
-        </mirror>
-    </mirrors>
+    <mirrors/>
 
     <pluginGroups/>
 
-    <proxies/>
+    <proxies>
+        <proxy>
+            <id>foo</id>
+            <active>true</active>
+            <protocol>http</protocol>
+            <host>https://proxy.example.com</host>
+            <port>443</port>
+            <username>foo</username>
+            <password>bar</password>
+            <nonProxyHosts>noproxy1.example.com|noproxy2.example.com</nonProxyHosts>
+        </proxy>
+    </proxies>
 
 </settings>
