@@ -343,6 +343,19 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
         <pluginGroup>some.plugin.group.id</pluginGroup>
         <pluginGroup>some.other.plugin.group.id</pluginGroup>
     </pluginGroups>
+
+    <proxies>
+        <proxy>
+            <id>foo-proxy</id>
+            <active>true</active>
+            <protocol>http</protocol>
+            <host>https://proxy.example.com</host>
+            <port>443</port>
+            <username>foo</username>
+            <password>bar</password>
+            <nonProxyHosts>noproxy1.example.com|noproxy2.example.com</nonProxyHosts>
+        </proxy>
+    </proxies>
   
 </settings>
 ````
