@@ -34,4 +34,6 @@
         <pluginGroup>some.plugin.group.id</pluginGroup>
     </pluginGroups>
 
+    <proxies/>
+
 </settings>
