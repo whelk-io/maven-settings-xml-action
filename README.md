@@ -178,10 +178,14 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
           "name": "some-repository-name",
           "url": "http://some.repository.url",
           "releases": {
-            "enabled": "true"
+            "enabled": "true",
+            "updatePolicy": "always",
+            "checksumPolicy": "fail"
           },
           "snapshots": {
-            "enabled": "false"
+            "enabled": "false",
+            "updatePolicy": "always",
+            "checksumPolicy": "fail"
           }
         }
       ]
@@ -281,9 +285,13 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
                     <url>http://some.repository.url</url>
                     <releases>
                         <enabled>true</enabled>
+                        <updatePolicy>always</updatePolicy>
+                        <checksumPolicy>fail</checksumPolicy>
                     </releases>
                     <snapshots>
                         <enabled>false</enabled>
+                        <updatePolicy>always</updatePolicy>
+                        <checksumPolicy>fail</checksumPolicy>
                     </snapshots>
                 </repository>
             </repositories>
