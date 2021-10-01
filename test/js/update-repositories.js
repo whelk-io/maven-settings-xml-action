@@ -63,5 +63,24 @@ describe('validate repositories', function () {
         });
     });
 
+    describe('when configuring updatePolicy on repositories', function () {
+        it('<repositories><releases> should be appended with <updatePolicy>', function () {
+            // given input
+            process.env['INPUT_REPOSITORIES'] = '[{ "id": "foo", "name": "foo", "url": "http://foo.bar", "releases": { "enabled": "true", "updatePolicy": "always" }, "snapshots": { "enabled": "true" } }]';
+
+            // when
+            var actualXml = settings.getSettingsTemplate();
+            settings.update(actualXml);
+            var actual = settings.formatSettings(actualXml);
+
+            // then
+            var expectedXml = settings.getTemplate('../test/js/resources/', 'when-repositories-update-policy.xml');
+            expected = settings.formatSettings(expectedXml);
+            assert.equal(actual, expected);
+
+            process.env['INPUT_REPOSITORIES'] = '';
+        });
+    });
+
 });
 
