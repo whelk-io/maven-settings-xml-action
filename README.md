@@ -4,7 +4,7 @@
 
 Github Action to create maven settings (`~/.m2/settings.xml`). 
 
-Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<pluginGroups>`, `<mirrors>`, `<activeProfiles>`, and `<profiles>`.
+Supports `<servers>`, `<repositories>`, `<pluginRepositories>`, `<pluginGroups>`, `<mirrors>`, `<activeProfiles>`, `<proxies>`, and `<profiles>`.
 
 ## Inputs
 
@@ -84,6 +84,18 @@ Reference: [Maven Settings > Profiles](http://maven.apache.org/settings.html#pro
 Set of `activeProfile` elements, which each have a value of a `profile` `id`. Any `profile` `id` defined as an `activeProfile` will be active, regardless of any environment settings. If no matching profile is found nothing will happen. For example, if `env-test` is an `activeProfile`, a profile in a `pom.xml` (or `profile.xml`) with a corresponding `id` will be active. If no such profile is found then execution will continue as normal.
 
 Reference: [Maven Settings > Active Profiles](https://maven.apache.org/settings.html#Active_Profiles)
+
+### `proxies`
+
+**Optional** json array of proxies to add to settings.xml.
+* **id** - The unique identifier for this proxy. This is used to differentiate between proxy elements.
+* **active** - true if this proxy is active. This is useful for declaring a set of proxies, but only one may be active at a time.
+* **protocol, host, port** - The protocol://host:port of the proxy, separated into discrete elements.
+* **username, password** - These elements appear as a pair denoting the login and password required to authenticate to this proxy server.
+* **nonProxyHosts** - This is a list of hosts which should not be proxied. The delimiter of the list is the expected type of the proxy server; the example above is pipe delimited - comma delimited is also common.
+
+
+Reference: [Maven Settings > Proxies](https://maven.apache.org/settings.html#proxies)
 
 ### `output_file`
 **Optional** String path of to generate `settings.xml`. By default, `~/.m2/settings.xml` is used. 
@@ -227,6 +239,19 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
         "some.plugin.group.id",
         "some.other.plugin.group.id"
       ]
+    proxies: >
+      [
+        {
+          "id": "foo-proxy",
+          "active": "true",
+          "protocol": "http",
+          "host": "https://proxy.example.com",
+          "port": "443",
+          "username": "foo",
+          "password": "bar",
+          "nonProxyHosts": "noproxy1.example.com|noproxy2.example.com"
+        }
+      ]
     active_profiles: >
       [
         "some-profile"
@@ -318,6 +343,19 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
         <pluginGroup>some.plugin.group.id</pluginGroup>
         <pluginGroup>some.other.plugin.group.id</pluginGroup>
     </pluginGroups>
+
+    <proxies>
+        <proxy>
+            <id>foo-proxy</id>
+            <active>true</active>
+            <protocol>http</protocol>
+            <host>https://proxy.example.com</host>
+            <port>443</port>
+            <username>foo</username>
+            <password>bar</password>
+            <nonProxyHosts>noproxy1.example.com|noproxy2.example.com</nonProxyHosts>
+        </proxy>
+    </proxies>
   
 </settings>
 ````
