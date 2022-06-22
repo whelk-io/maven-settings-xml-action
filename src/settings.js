@@ -1,8 +1,8 @@
 var core = require('@actions/core');
 var path = require('path');
 var fs = require('fs');
-var DOMParser = require('xmldom').DOMParser;
-var XMLSerializer = require('xmldom').XMLSerializer;
+var DOMParser = require('@xmldom/xmldom').DOMParser;
+var XMLSerializer = require('@xmldom/xmldom').XMLSerializer;
 var format = require('xml-formatter');
 
 function getSettingsTemplate() {

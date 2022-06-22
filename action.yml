@@ -29,5 +29,5 @@ inputs:
   output_file:
     description: 'path to generated file, default is .m2/settings.xml'
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'
