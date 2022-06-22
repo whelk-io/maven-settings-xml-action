@@ -43,6 +43,13 @@ module.exports =
 /************************************************************************/
 /******/ ({
 
+/***/ 16:
+/***/ (function(module) {
+
+module.exports = require("tls");
+
+/***/ }),
+
 /***/ 82:
 /***/ (function(__unusedmodule, exports) {
 
@@ -51,7 +58,7 @@ module.exports =
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.toCommandValue = void 0;
+exports.toCommandProperties = exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -66,6 +73,26 @@ function toCommandValue(input) {
     return JSON.stringify(input);
 }
 exports.toCommandValue = toCommandValue;
+/**
+ *
+ * @param annotationProperties
+ * @returns The command properties to send with the actual annotation command
+ * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
+ */
+function toCommandProperties(annotationProperties) {
+    if (!Object.keys(annotationProperties).length) {
+        return {};
+    }
+    return {
+        title: annotationProperties.title,
+        file: annotationProperties.file,
+        line: annotationProperties.startLine,
+        endLine: annotationProperties.endLine,
+        col: annotationProperties.startColumn,
+        endColumn: annotationProperties.endColumn
+    };
+}
+exports.toCommandProperties = toCommandProperties;
 //# sourceMappingURL=utils.js.map
 
 /***/ }),
@@ -123,6 +150,1911 @@ function issueCommand(command, message) {
 }
 exports.issueCommand = issueCommand;
 //# sourceMappingURL=file-command.js.map
+
+/***/ }),
+
+/***/ 141:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+var net = __webpack_require__(631);
+var tls = __webpack_require__(16);
+var http = __webpack_require__(605);
+var https = __webpack_require__(211);
+var events = __webpack_require__(614);
+var assert = __webpack_require__(357);
+var util = __webpack_require__(669);
+
+
+exports.httpOverHttp = httpOverHttp;
+exports.httpsOverHttp = httpsOverHttp;
+exports.httpOverHttps = httpOverHttps;
+exports.httpsOverHttps = httpsOverHttps;
+
+
+function httpOverHttp(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = http.request;
+  return agent;
+}
+
+function httpsOverHttp(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = http.request;
+  agent.createSocket = createSecureSocket;
+  agent.defaultPort = 443;
+  return agent;
+}
+
+function httpOverHttps(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = https.request;
+  return agent;
+}
+
+function httpsOverHttps(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = https.request;
+  agent.createSocket = createSecureSocket;
+  agent.defaultPort = 443;
+  return agent;
+}
+
+
+function TunnelingAgent(options) {
+  var self = this;
+  self.options = options || {};
+  self.proxyOptions = self.options.proxy || {};
+  self.maxSockets = self.options.maxSockets || http.Agent.defaultMaxSockets;
+  self.requests = [];
+  self.sockets = [];
+
+  self.on('free', function onFree(socket, host, port, localAddress) {
+    var options = toOptions(host, port, localAddress);
+    for (var i = 0, len = self.requests.length; i < len; ++i) {
+      var pending = self.requests[i];
+      if (pending.host === options.host && pending.port === options.port) {
+        // Detect the request to connect same origin server,
+        // reuse the connection.
+        self.requests.splice(i, 1);
+        pending.request.onSocket(socket);
+        return;
+      }
+    }
+    socket.destroy();
+    self.removeSocket(socket);
+  });
+}
+util.inherits(TunnelingAgent, events.EventEmitter);
+
+TunnelingAgent.prototype.addRequest = function addRequest(req, host, port, localAddress) {
+  var self = this;
+  var options = mergeOptions({request: req}, self.options, toOptions(host, port, localAddress));
+
+  if (self.sockets.length >= this.maxSockets) {
+    // We are over limit so we'll add it to the queue.
+    self.requests.push(options);
+    return;
+  }
+
+  // If we are under maxSockets create a new one.
+  self.createSocket(options, function(socket) {
+    socket.on('free', onFree);
+    socket.on('close', onCloseOrRemove);
+    socket.on('agentRemove', onCloseOrRemove);
+    req.onSocket(socket);
+
+    function onFree() {
+      self.emit('free', socket, options);
+    }
+
+    function onCloseOrRemove(err) {
+      self.removeSocket(socket);
+      socket.removeListener('free', onFree);
+      socket.removeListener('close', onCloseOrRemove);
+      socket.removeListener('agentRemove', onCloseOrRemove);
+    }
+  });
+};
+
+TunnelingAgent.prototype.createSocket = function createSocket(options, cb) {
+  var self = this;
+  var placeholder = {};
+  self.sockets.push(placeholder);
+
+  var connectOptions = mergeOptions({}, self.proxyOptions, {
+    method: 'CONNECT',
+    path: options.host + ':' + options.port,
+    agent: false,
+    headers: {
+      host: options.host + ':' + options.port
+    }
+  });
+  if (options.localAddress) {
+    connectOptions.localAddress = options.localAddress;
+  }
+  if (connectOptions.proxyAuth) {
+    connectOptions.headers = connectOptions.headers || {};
+    connectOptions.headers['Proxy-Authorization'] = 'Basic ' +
+        new Buffer(connectOptions.proxyAuth).toString('base64');
+  }
+
+  debug('making CONNECT request');
+  var connectReq = self.request(connectOptions);
+  connectReq.useChunkedEncodingByDefault = false; // for v0.6
+  connectReq.once('response', onResponse); // for v0.6
+  connectReq.once('upgrade', onUpgrade);   // for v0.6
+  connectReq.once('connect', onConnect);   // for v0.7 or later
+  connectReq.once('error', onError);
+  connectReq.end();
+
+  function onResponse(res) {
+    // Very hacky. This is necessary to avoid http-parser leaks.
+    res.upgrade = true;
+  }
+
+  function onUpgrade(res, socket, head) {
+    // Hacky.
+    process.nextTick(function() {
+      onConnect(res, socket, head);
+    });
+  }
+
+  function onConnect(res, socket, head) {
+    connectReq.removeAllListeners();
+    socket.removeAllListeners();
+
+    if (res.statusCode !== 200) {
+      debug('tunneling socket could not be established, statusCode=%d',
+        res.statusCode);
+      socket.destroy();
+      var error = new Error('tunneling socket could not be established, ' +
+        'statusCode=' + res.statusCode);
+      error.code = 'ECONNRESET';
+      options.request.emit('error', error);
+      self.removeSocket(placeholder);
+      return;
+    }
+    if (head.length > 0) {
+      debug('got illegal response body from proxy');
+      socket.destroy();
+      var error = new Error('got illegal response body from proxy');
+      error.code = 'ECONNRESET';
+      options.request.emit('error', error);
+      self.removeSocket(placeholder);
+      return;
+    }
+    debug('tunneling connection has established');
+    self.sockets[self.sockets.indexOf(placeholder)] = socket;
+    return cb(socket);
+  }
+
+  function onError(cause) {
+    connectReq.removeAllListeners();
+
+    debug('tunneling socket could not be established, cause=%s\n',
+          cause.message, cause.stack);
+    var error = new Error('tunneling socket could not be established, ' +
+                          'cause=' + cause.message);
+    error.code = 'ECONNRESET';
+    options.request.emit('error', error);
+    self.removeSocket(placeholder);
+  }
+};
+
+TunnelingAgent.prototype.removeSocket = function removeSocket(socket) {
+  var pos = this.sockets.indexOf(socket)
+  if (pos === -1) {
+    return;
+  }
+  this.sockets.splice(pos, 1);
+
+  var pending = this.requests.shift();
+  if (pending) {
+    // If we have pending requests and a socket gets closed a new one
+    // needs to be created to take over in the pool for the one that closed.
+    this.createSocket(pending, function(socket) {
+      pending.request.onSocket(socket);
+    });
+  }
+};
+
+function createSecureSocket(options, cb) {
+  var self = this;
+  TunnelingAgent.prototype.createSocket.call(self, options, function(socket) {
+    var hostHeader = options.request.getHeader('host');
+    var tlsOptions = mergeOptions({}, self.options, {
+      socket: socket,
+      servername: hostHeader ? hostHeader.replace(/:.*$/, '') : options.host
+    });
+
+    // 0 is dummy port for v0.6
+    var secureSocket = tls.connect(0, tlsOptions);
+    self.sockets[self.sockets.indexOf(socket)] = secureSocket;
+    cb(secureSocket);
+  });
+}
+
+
+function toOptions(host, port, localAddress) {
+  if (typeof host === 'string') { // since v0.10
+    return {
+      host: host,
+      port: port,
+      localAddress: localAddress
+    };
+  }
+  return host; // for v0.11 or later
+}
+
+function mergeOptions(target) {
+  for (var i = 1, len = arguments.length; i < len; ++i) {
+    var overrides = arguments[i];
+    if (typeof overrides === 'object') {
+      var keys = Object.keys(overrides);
+      for (var j = 0, keyLen = keys.length; j < keyLen; ++j) {
+        var k = keys[j];
+        if (overrides[k] !== undefined) {
+          target[k] = overrides[k];
+        }
+      }
+    }
+  }
+  return target;
+}
+
+
+var debug;
+if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
+  debug = function() {
+    var args = Array.prototype.slice.call(arguments);
+    if (typeof args[0] === 'string') {
+      args[0] = 'TUNNEL: ' + args[0];
+    } else {
+      args.unshift('TUNNEL:');
+    }
+    console.error.apply(console, args);
+  }
+} else {
+  debug = function() {};
+}
+exports.debug = debug; // for test
+
+
+/***/ }),
+
+/***/ 177:
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkBypass = exports.getProxyUrl = void 0;
+function getProxyUrl(reqUrl) {
+    const usingSsl = reqUrl.protocol === 'https:';
+    if (checkBypass(reqUrl)) {
+        return undefined;
+    }
+    const proxyVar = (() => {
+        if (usingSsl) {
+            return process.env['https_proxy'] || process.env['HTTPS_PROXY'];
+        }
+        else {
+            return process.env['http_proxy'] || process.env['HTTP_PROXY'];
+        }
+    })();
+    if (proxyVar) {
+        return new URL(proxyVar);
+    }
+    else {
+        return undefined;
+    }
+}
+exports.getProxyUrl = getProxyUrl;
+function checkBypass(reqUrl) {
+    if (!reqUrl.hostname) {
+        return false;
+    }
+    const noProxy = process.env['no_proxy'] || process.env['NO_PROXY'] || '';
+    if (!noProxy) {
+        return false;
+    }
+    // Determine the request port
+    let reqPort;
+    if (reqUrl.port) {
+        reqPort = Number(reqUrl.port);
+    }
+    else if (reqUrl.protocol === 'http:') {
+        reqPort = 80;
+    }
+    else if (reqUrl.protocol === 'https:') {
+        reqPort = 443;
+    }
+    // Format the request hostname and hostname with port
+    const upperReqHosts = [reqUrl.hostname.toUpperCase()];
+    if (typeof reqPort === 'number') {
+        upperReqHosts.push(`${upperReqHosts[0]}:${reqPort}`);
+    }
+    // Compare request host against noproxy
+    for (const upperNoProxyItem of noProxy
+        .split(',')
+        .map(x => x.trim().toUpperCase())
+        .filter(x => x)) {
+        if (upperReqHosts.some(x => x === upperNoProxyItem)) {
+            return true;
+        }
+    }
+    return false;
+}
+exports.checkBypass = checkBypass;
+//# sourceMappingURL=proxy.js.map
+
+/***/ }),
+
+/***/ 211:
+/***/ (function(module) {
+
+module.exports = require("https");
+
+/***/ }),
+
+/***/ 225:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+var freeze = __webpack_require__(681).freeze;
+
+/**
+ * The entities that are predefined in every XML document.
+ *
+ * @see https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-predefined-ent W3C XML 1.1
+ * @see https://www.w3.org/TR/2008/REC-xml-20081126/#sec-predefined-ent W3C XML 1.0
+ * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Predefined_entities_in_XML Wikipedia
+ */
+exports.XML_ENTITIES = freeze({amp:'&', apos:"'", gt:'>', lt:'<', quot:'"'})
+
+/**
+ * A map of currently 241 entities that are detected in an HTML document.
+ * They contain all entries from `XML_ENTITIES`.
+ *
+ * @see XML_ENTITIES
+ * @see DOMParser.parseFromString
+ * @see DOMImplementation.prototype.createHTMLDocument
+ * @see https://html.spec.whatwg.org/#named-character-references WHATWG HTML(5) Spec
+ * @see https://www.w3.org/TR/xml-entity-names/ W3C XML Entity Names
+ * @see https://www.w3.org/TR/html4/sgml/entities.html W3C HTML4/SGML
+ * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Character_entity_references_in_HTML Wikipedia (HTML)
+ * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Entities_representing_special_characters_in_XHTML Wikpedia (XHTML)
+ */
+exports.HTML_ENTITIES = freeze({
+       lt: '<',
+       gt: '>',
+       amp: '&',
+       quot: '"',
+       apos: "'",
+       Agrave: "À",
+       Aacute: "Á",
+       Acirc: "Â",
+       Atilde: "Ã",
+       Auml: "Ä",
+       Aring: "Å",
+       AElig: "Æ",
+       Ccedil: "Ç",
+       Egrave: "È",
+       Eacute: "É",
+       Ecirc: "Ê",
+       Euml: "Ë",
+       Igrave: "Ì",
+       Iacute: "Í",
+       Icirc: "Î",
+       Iuml: "Ï",
+       ETH: "Ð",
+       Ntilde: "Ñ",
+       Ograve: "Ò",
+       Oacute: "Ó",
+       Ocirc: "Ô",
+       Otilde: "Õ",
+       Ouml: "Ö",
+       Oslash: "Ø",
+       Ugrave: "Ù",
+       Uacute: "Ú",
+       Ucirc: "Û",
+       Uuml: "Ü",
+       Yacute: "Ý",
+       THORN: "Þ",
+       szlig: "ß",
+       agrave: "à",
+       aacute: "á",
+       acirc: "â",
+       atilde: "ã",
+       auml: "ä",
+       aring: "å",
+       aelig: "æ",
+       ccedil: "ç",
+       egrave: "è",
+       eacute: "é",
+       ecirc: "ê",
+       euml: "ë",
+       igrave: "ì",
+       iacute: "í",
+       icirc: "î",
+       iuml: "ï",
+       eth: "ð",
+       ntilde: "ñ",
+       ograve: "ò",
+       oacute: "ó",
+       ocirc: "ô",
+       otilde: "õ",
+       ouml: "ö",
+       oslash: "ø",
+       ugrave: "ù",
+       uacute: "ú",
+       ucirc: "û",
+       uuml: "ü",
+       yacute: "ý",
+       thorn: "þ",
+       yuml: "ÿ",
+       nbsp: "\u00a0",
+       iexcl: "¡",
+       cent: "¢",
+       pound: "£",
+       curren: "¤",
+       yen: "¥",
+       brvbar: "¦",
+       sect: "§",
+       uml: "¨",
+       copy: "©",
+       ordf: "ª",
+       laquo: "«",
+       not: "¬",
+       shy: "­­",
+       reg: "®",
+       macr: "¯",
+       deg: "°",
+       plusmn: "±",
+       sup2: "²",
+       sup3: "³",
+       acute: "´",
+       micro: "µ",
+       para: "¶",
+       middot: "·",
+       cedil: "¸",
+       sup1: "¹",
+       ordm: "º",
+       raquo: "»",
+       frac14: "¼",
+       frac12: "½",
+       frac34: "¾",
+       iquest: "¿",
+       times: "×",
+       divide: "÷",
+       forall: "∀",
+       part: "∂",
+       exist: "∃",
+       empty: "∅",
+       nabla: "∇",
+       isin: "∈",
+       notin: "∉",
+       ni: "∋",
+       prod: "∏",
+       sum: "∑",
+       minus: "−",
+       lowast: "∗",
+       radic: "√",
+       prop: "∝",
+       infin: "∞",
+       ang: "∠",
+       and: "∧",
+       or: "∨",
+       cap: "∩",
+       cup: "∪",
+       'int': "∫",
+       there4: "∴",
+       sim: "∼",
+       cong: "≅",
+       asymp: "≈",
+       ne: "≠",
+       equiv: "≡",
+       le: "≤",
+       ge: "≥",
+       sub: "⊂",
+       sup: "⊃",
+       nsub: "⊄",
+       sube: "⊆",
+       supe: "⊇",
+       oplus: "⊕",
+       otimes: "⊗",
+       perp: "⊥",
+       sdot: "⋅",
+       Alpha: "Α",
+       Beta: "Β",
+       Gamma: "Γ",
+       Delta: "Δ",
+       Epsilon: "Ε",
+       Zeta: "Ζ",
+       Eta: "Η",
+       Theta: "Θ",
+       Iota: "Ι",
+       Kappa: "Κ",
+       Lambda: "Λ",
+       Mu: "Μ",
+       Nu: "Ν",
+       Xi: "Ξ",
+       Omicron: "Ο",
+       Pi: "Π",
+       Rho: "Ρ",
+       Sigma: "Σ",
+       Tau: "Τ",
+       Upsilon: "Υ",
+       Phi: "Φ",
+       Chi: "Χ",
+       Psi: "Ψ",
+       Omega: "Ω",
+       alpha: "α",
+       beta: "β",
+       gamma: "γ",
+       delta: "δ",
+       epsilon: "ε",
+       zeta: "ζ",
+       eta: "η",
+       theta: "θ",
+       iota: "ι",
+       kappa: "κ",
+       lambda: "λ",
+       mu: "μ",
+       nu: "ν",
+       xi: "ξ",
+       omicron: "ο",
+       pi: "π",
+       rho: "ρ",
+       sigmaf: "ς",
+       sigma: "σ",
+       tau: "τ",
+       upsilon: "υ",
+       phi: "φ",
+       chi: "χ",
+       psi: "ψ",
+       omega: "ω",
+       thetasym: "ϑ",
+       upsih: "ϒ",
+       piv: "ϖ",
+       OElig: "Œ",
+       oelig: "œ",
+       Scaron: "Š",
+       scaron: "š",
+       Yuml: "Ÿ",
+       fnof: "ƒ",
+       circ: "ˆ",
+       tilde: "˜",
+       ensp: " ",
+       emsp: " ",
+       thinsp: " ",
+       zwnj: "‌",
+       zwj: "‍",
+       lrm: "‎",
+       rlm: "‏",
+       ndash: "–",
+       mdash: "—",
+       lsquo: "‘",
+       rsquo: "’",
+       sbquo: "‚",
+       ldquo: "“",
+       rdquo: "”",
+       bdquo: "„",
+       dagger: "†",
+       Dagger: "‡",
+       bull: "•",
+       hellip: "…",
+       permil: "‰",
+       prime: "′",
+       Prime: "″",
+       lsaquo: "‹",
+       rsaquo: "›",
+       oline: "‾",
+       euro: "€",
+       trade: "™",
+       larr: "←",
+       uarr: "↑",
+       rarr: "→",
+       darr: "↓",
+       harr: "↔",
+       crarr: "↵",
+       lceil: "⌈",
+       rceil: "⌉",
+       lfloor: "⌊",
+       rfloor: "⌋",
+       loz: "◊",
+       spades: "♠",
+       clubs: "♣",
+       hearts: "♥",
+       diams: "♦"
+});
+
+/**
+ * @deprecated use `HTML_ENTITIES` instead
+ * @see HTML_ENTITIES
+ */
+exports.entityMap = exports.HTML_ENTITIES
+
+
+/***/ }),
+
+/***/ 286:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+var NAMESPACE = __webpack_require__(681).NAMESPACE;
+
+//[4]   	NameStartChar	   ::=   	":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
+//[4a]   	NameChar	   ::=   	NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
+//[5]   	Name	   ::=   	NameStartChar (NameChar)*
+var nameStartChar = /[A-Z_a-z\xC0-\xD6\xD8-\xF6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]///\u10000-\uEFFFF
+var nameChar = new RegExp("[\\-\\.0-9"+nameStartChar.source.slice(1,-1)+"\\u00B7\\u0300-\\u036F\\u203F-\\u2040]");
+var tagNamePattern = new RegExp('^'+nameStartChar.source+nameChar.source+'*(?:\:'+nameStartChar.source+nameChar.source+'*)?$');
+//var tagNamePattern = /^[a-zA-Z_][\w\-\.]*(?:\:[a-zA-Z_][\w\-\.]*)?$/
+//var handlers = 'resolveEntity,getExternalSubset,characters,endDocument,endElement,endPrefixMapping,ignorableWhitespace,processingInstruction,setDocumentLocator,skippedEntity,startDocument,startElement,startPrefixMapping,notationDecl,unparsedEntityDecl,error,fatalError,warning,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,comment,endCDATA,endDTD,endEntity,startCDATA,startDTD,startEntity'.split(',')
+
+//S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
+//S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
+var S_TAG = 0;//tag name offerring
+var S_ATTR = 1;//attr name offerring 
+var S_ATTR_SPACE=2;//attr name end and space offer
+var S_EQ = 3;//=space?
+var S_ATTR_NOQUOT_VALUE = 4;//attr value(no quot value only)
+var S_ATTR_END = 5;//attr value end and no space(quot end)
+var S_TAG_SPACE = 6;//(attr value end || tag end ) && (space offer)
+var S_TAG_CLOSE = 7;//closed el<el />
+
+/**
+ * Creates an error that will not be caught by XMLReader aka the SAX parser.
+ *
+ * @param {string} message
+ * @param {any?} locator Optional, can provide details about the location in the source
+ * @constructor
+ */
+function ParseError(message, locator) {
+	this.message = message
+	this.locator = locator
+	if(Error.captureStackTrace) Error.captureStackTrace(this, ParseError);
+}
+ParseError.prototype = new Error();
+ParseError.prototype.name = ParseError.name
+
+function XMLReader(){
+	
+}
+
+XMLReader.prototype = {
+	parse:function(source,defaultNSMap,entityMap){
+		var domBuilder = this.domBuilder;
+		domBuilder.startDocument();
+		_copy(defaultNSMap ,defaultNSMap = {})
+		parse(source,defaultNSMap,entityMap,
+				domBuilder,this.errorHandler);
+		domBuilder.endDocument();
+	}
+}
+function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
+	function fixedFromCharCode(code) {
+		// String.prototype.fromCharCode does not supports
+		// > 2 bytes unicode chars directly
+		if (code > 0xffff) {
+			code -= 0x10000;
+			var surrogate1 = 0xd800 + (code >> 10)
+				, surrogate2 = 0xdc00 + (code & 0x3ff);
+
+			return String.fromCharCode(surrogate1, surrogate2);
+		} else {
+			return String.fromCharCode(code);
+		}
+	}
+	function entityReplacer(a){
+		var k = a.slice(1,-1);
+		if(k in entityMap){
+			return entityMap[k]; 
+		}else if(k.charAt(0) === '#'){
+			return fixedFromCharCode(parseInt(k.substr(1).replace('x','0x')))
+		}else{
+			errorHandler.error('entity not found:'+a);
+			return a;
+		}
+	}
+	function appendText(end){//has some bugs
+		if(end>start){
+			var xt = source.substring(start,end).replace(/&#?\w+;/g,entityReplacer);
+			locator&&position(start);
+			domBuilder.characters(xt,0,end-start);
+			start = end
+		}
+	}
+	function position(p,m){
+		while(p>=lineEnd && (m = linePattern.exec(source))){
+			lineStart = m.index;
+			lineEnd = lineStart + m[0].length;
+			locator.lineNumber++;
+			//console.log('line++:',locator,startPos,endPos)
+		}
+		locator.columnNumber = p-lineStart+1;
+	}
+	var lineStart = 0;
+	var lineEnd = 0;
+	var linePattern = /.*(?:\r\n?|\n)|.*$/g
+	var locator = domBuilder.locator;
+	
+	var parseStack = [{currentNSMap:defaultNSMapCopy}]
+	var closeMap = {};
+	var start = 0;
+	while(true){
+		try{
+			var tagStart = source.indexOf('<',start);
+			if(tagStart<0){
+				if(!source.substr(start).match(/^\s*$/)){
+					var doc = domBuilder.doc;
+	    			var text = doc.createTextNode(source.substr(start));
+	    			doc.appendChild(text);
+	    			domBuilder.currentElement = text;
+				}
+				return;
+			}
+			if(tagStart>start){
+				appendText(tagStart);
+			}
+			switch(source.charAt(tagStart+1)){
+			case '/':
+				var end = source.indexOf('>',tagStart+3);
+				var tagName = source.substring(tagStart + 2, end).replace(/[ \t\n\r]+$/g, '');
+				var config = parseStack.pop();
+				if(end<0){
+					
+	        		tagName = source.substring(tagStart+2).replace(/[\s<].*/,'');
+	        		errorHandler.error("end tag name: "+tagName+' is not complete:'+config.tagName);
+	        		end = tagStart+1+tagName.length;
+	        	}else if(tagName.match(/\s</)){
+	        		tagName = tagName.replace(/[\s<].*/,'');
+	        		errorHandler.error("end tag name: "+tagName+' maybe not complete');
+	        		end = tagStart+1+tagName.length;
+				}
+				var localNSMap = config.localNSMap;
+				var endMatch = config.tagName == tagName;
+				var endIgnoreCaseMach = endMatch || config.tagName&&config.tagName.toLowerCase() == tagName.toLowerCase()
+		        if(endIgnoreCaseMach){
+		        	domBuilder.endElement(config.uri,config.localName,tagName);
+					if(localNSMap){
+						for(var prefix in localNSMap){
+							domBuilder.endPrefixMapping(prefix) ;
+						}
+					}
+					if(!endMatch){
+		            	errorHandler.fatalError("end tag name: "+tagName+' is not match the current start tagName:'+config.tagName ); // No known test case
+					}
+		        }else{
+		        	parseStack.push(config)
+		        }
+				
+				end++;
+				break;
+				// end elment
+			case '?':// <?...?>
+				locator&&position(tagStart);
+				end = parseInstruction(source,tagStart,domBuilder);
+				break;
+			case '!':// <!doctype,<![CDATA,<!--
+				locator&&position(tagStart);
+				end = parseDCC(source,tagStart,domBuilder,errorHandler);
+				break;
+			default:
+				locator&&position(tagStart);
+				var el = new ElementAttributes();
+				var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
+				//elStartEnd
+				var end = parseElementStartPart(source,tagStart,el,currentNSMap,entityReplacer,errorHandler);
+				var len = el.length;
+				
+				
+				if(!el.closed && fixSelfClosed(source,end,el.tagName,closeMap)){
+					el.closed = true;
+					if(!entityMap.nbsp){
+						errorHandler.warning('unclosed xml attribute');
+					}
+				}
+				if(locator && len){
+					var locator2 = copyLocator(locator,{});
+					//try{//attribute position fixed
+					for(var i = 0;i<len;i++){
+						var a = el[i];
+						position(a.offset);
+						a.locator = copyLocator(locator,{});
+					}
+					domBuilder.locator = locator2
+					if(appendElement(el,domBuilder,currentNSMap)){
+						parseStack.push(el)
+					}
+					domBuilder.locator = locator;
+				}else{
+					if(appendElement(el,domBuilder,currentNSMap)){
+						parseStack.push(el)
+					}
+				}
+
+				if (NAMESPACE.isHTML(el.uri) && !el.closed) {
+					end = parseHtmlSpecialContent(source,end,el.tagName,entityReplacer,domBuilder)
+				} else {
+					end++;
+				}
+			}
+		}catch(e){
+			if (e instanceof ParseError) {
+				throw e;
+			}
+			errorHandler.error('element parse error: '+e)
+			end = -1;
+		}
+		if(end>start){
+			start = end;
+		}else{
+			//TODO: 这里有可能sax回退，有位置错误风险
+			appendText(Math.max(tagStart,start)+1);
+		}
+	}
+}
+function copyLocator(f,t){
+	t.lineNumber = f.lineNumber;
+	t.columnNumber = f.columnNumber;
+	return t;
+}
+
+/**
+ * @see #appendElement(source,elStartEnd,el,selfClosed,entityReplacer,domBuilder,parseStack);
+ * @return end of the elementStartPart(end of elementEndPart for selfClosed el)
+ */
+function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,errorHandler){
+
+	/**
+	 * @param {string} qname
+	 * @param {string} value
+	 * @param {number} startIndex
+	 */
+	function addAttribute(qname, value, startIndex) {
+		if (el.attributeNames.hasOwnProperty(qname)) {
+			errorHandler.fatalError('Attribute ' + qname + ' redefined')
+		}
+		el.addValue(qname, value, startIndex)
+	}
+	var attrName;
+	var value;
+	var p = ++start;
+	var s = S_TAG;//status
+	while(true){
+		var c = source.charAt(p);
+		switch(c){
+		case '=':
+			if(s === S_ATTR){//attrName
+				attrName = source.slice(start,p);
+				s = S_EQ;
+			}else if(s === S_ATTR_SPACE){
+				s = S_EQ;
+			}else{
+				//fatalError: equal must after attrName or space after attrName
+				throw new Error('attribute equal must after attrName'); // No known test case
+			}
+			break;
+		case '\'':
+		case '"':
+			if(s === S_EQ || s === S_ATTR //|| s == S_ATTR_SPACE
+				){//equal
+				if(s === S_ATTR){
+					errorHandler.warning('attribute value must after "="')
+					attrName = source.slice(start,p)
+				}
+				start = p+1;
+				p = source.indexOf(c,start)
+				if(p>0){
+					value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+					addAttribute(attrName, value, start-1);
+					s = S_ATTR_END;
+				}else{
+					//fatalError: no end quot match
+					throw new Error('attribute value no end \''+c+'\' match');
+				}
+			}else if(s == S_ATTR_NOQUOT_VALUE){
+				value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+				//console.log(attrName,value,start,p)
+				addAttribute(attrName, value, start);
+				//console.dir(el)
+				errorHandler.warning('attribute "'+attrName+'" missed start quot('+c+')!!');
+				start = p+1;
+				s = S_ATTR_END
+			}else{
+				//fatalError: no equal before
+				throw new Error('attribute value must after "="'); // No known test case
+			}
+			break;
+		case '/':
+			switch(s){
+			case S_TAG:
+				el.setTagName(source.slice(start,p));
+			case S_ATTR_END:
+			case S_TAG_SPACE:
+			case S_TAG_CLOSE:
+				s =S_TAG_CLOSE;
+				el.closed = true;
+			case S_ATTR_NOQUOT_VALUE:
+			case S_ATTR:
+			case S_ATTR_SPACE:
+				break;
+			//case S_EQ:
+			default:
+				throw new Error("attribute invalid close char('/')") // No known test case
+			}
+			break;
+		case ''://end document
+			errorHandler.error('unexpected end of input');
+			if(s == S_TAG){
+				el.setTagName(source.slice(start,p));
+			}
+			return p;
+		case '>':
+			switch(s){
+			case S_TAG:
+				el.setTagName(source.slice(start,p));
+			case S_ATTR_END:
+			case S_TAG_SPACE:
+			case S_TAG_CLOSE:
+				break;//normal
+			case S_ATTR_NOQUOT_VALUE://Compatible state
+			case S_ATTR:
+				value = source.slice(start,p);
+				if(value.slice(-1) === '/'){
+					el.closed  = true;
+					value = value.slice(0,-1)
+				}
+			case S_ATTR_SPACE:
+				if(s === S_ATTR_SPACE){
+					value = attrName;
+				}
+				if(s == S_ATTR_NOQUOT_VALUE){
+					errorHandler.warning('attribute "'+value+'" missed quot(")!');
+					addAttribute(attrName, value.replace(/&#?\w+;/g,entityReplacer), start)
+				}else{
+					if(!NAMESPACE.isHTML(currentNSMap['']) || !value.match(/^(?:disabled|checked|selected)$/i)){
+						errorHandler.warning('attribute "'+value+'" missed value!! "'+value+'" instead!!')
+					}
+					addAttribute(value, value, start)
+				}
+				break;
+			case S_EQ:
+				throw new Error('attribute value missed!!');
+			}
+//			console.log(tagName,tagNamePattern,tagNamePattern.test(tagName))
+			return p;
+		/*xml space '\x20' | #x9 | #xD | #xA; */
+		case '\u0080':
+			c = ' ';
+		default:
+			if(c<= ' '){//space
+				switch(s){
+				case S_TAG:
+					el.setTagName(source.slice(start,p));//tagName
+					s = S_TAG_SPACE;
+					break;
+				case S_ATTR:
+					attrName = source.slice(start,p)
+					s = S_ATTR_SPACE;
+					break;
+				case S_ATTR_NOQUOT_VALUE:
+					var value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+					errorHandler.warning('attribute "'+value+'" missed quot(")!!');
+					addAttribute(attrName, value, start)
+				case S_ATTR_END:
+					s = S_TAG_SPACE;
+					break;
+				//case S_TAG_SPACE:
+				//case S_EQ:
+				//case S_ATTR_SPACE:
+				//	void();break;
+				//case S_TAG_CLOSE:
+					//ignore warning
+				}
+			}else{//not space
+//S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
+//S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
+				switch(s){
+				//case S_TAG:void();break;
+				//case S_ATTR:void();break;
+				//case S_ATTR_NOQUOT_VALUE:void();break;
+				case S_ATTR_SPACE:
+					var tagName =  el.tagName;
+					if (!NAMESPACE.isHTML(currentNSMap['']) || !attrName.match(/^(?:disabled|checked|selected)$/i)) {
+						errorHandler.warning('attribute "'+attrName+'" missed value!! "'+attrName+'" instead2!!')
+					}
+					addAttribute(attrName, attrName, start);
+					start = p;
+					s = S_ATTR;
+					break;
+				case S_ATTR_END:
+					errorHandler.warning('attribute space is required"'+attrName+'"!!')
+				case S_TAG_SPACE:
+					s = S_ATTR;
+					start = p;
+					break;
+				case S_EQ:
+					s = S_ATTR_NOQUOT_VALUE;
+					start = p;
+					break;
+				case S_TAG_CLOSE:
+					throw new Error("elements closed character '/' and '>' must be connected to");
+				}
+			}
+		}//end outer switch
+		//console.log('p++',p)
+		p++;
+	}
+}
+/**
+ * @return true if has new namespace define
+ */
+function appendElement(el,domBuilder,currentNSMap){
+	var tagName = el.tagName;
+	var localNSMap = null;
+	//var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
+	var i = el.length;
+	while(i--){
+		var a = el[i];
+		var qName = a.qName;
+		var value = a.value;
+		var nsp = qName.indexOf(':');
+		if(nsp>0){
+			var prefix = a.prefix = qName.slice(0,nsp);
+			var localName = qName.slice(nsp+1);
+			var nsPrefix = prefix === 'xmlns' && localName
+		}else{
+			localName = qName;
+			prefix = null
+			nsPrefix = qName === 'xmlns' && ''
+		}
+		//can not set prefix,because prefix !== ''
+		a.localName = localName ;
+		//prefix == null for no ns prefix attribute 
+		if(nsPrefix !== false){//hack!!
+			if(localNSMap == null){
+				localNSMap = {}
+				//console.log(currentNSMap,0)
+				_copy(currentNSMap,currentNSMap={})
+				//console.log(currentNSMap,1)
+			}
+			currentNSMap[nsPrefix] = localNSMap[nsPrefix] = value;
+			a.uri = NAMESPACE.XMLNS
+			domBuilder.startPrefixMapping(nsPrefix, value) 
+		}
+	}
+	var i = el.length;
+	while(i--){
+		a = el[i];
+		var prefix = a.prefix;
+		if(prefix){//no prefix attribute has no namespace
+			if(prefix === 'xml'){
+				a.uri = NAMESPACE.XML;
+			}if(prefix !== 'xmlns'){
+				a.uri = currentNSMap[prefix || '']
+				
+				//{console.log('###'+a.qName,domBuilder.locator.systemId+'',currentNSMap,a.uri)}
+			}
+		}
+	}
+	var nsp = tagName.indexOf(':');
+	if(nsp>0){
+		prefix = el.prefix = tagName.slice(0,nsp);
+		localName = el.localName = tagName.slice(nsp+1);
+	}else{
+		prefix = null;//important!!
+		localName = el.localName = tagName;
+	}
+	//no prefix element has default namespace
+	var ns = el.uri = currentNSMap[prefix || ''];
+	domBuilder.startElement(ns,localName,tagName,el);
+	//endPrefixMapping and startPrefixMapping have not any help for dom builder
+	//localNSMap = null
+	if(el.closed){
+		domBuilder.endElement(ns,localName,tagName);
+		if(localNSMap){
+			for(prefix in localNSMap){
+				domBuilder.endPrefixMapping(prefix) 
+			}
+		}
+	}else{
+		el.currentNSMap = currentNSMap;
+		el.localNSMap = localNSMap;
+		//parseStack.push(el);
+		return true;
+	}
+}
+function parseHtmlSpecialContent(source,elStartEnd,tagName,entityReplacer,domBuilder){
+	if(/^(?:script|textarea)$/i.test(tagName)){
+		var elEndStart =  source.indexOf('</'+tagName+'>',elStartEnd);
+		var text = source.substring(elStartEnd+1,elEndStart);
+		if(/[&<]/.test(text)){
+			if(/^script$/i.test(tagName)){
+				//if(!/\]\]>/.test(text)){
+					//lexHandler.startCDATA();
+					domBuilder.characters(text,0,text.length);
+					//lexHandler.endCDATA();
+					return elEndStart;
+				//}
+			}//}else{//text area
+				text = text.replace(/&#?\w+;/g,entityReplacer);
+				domBuilder.characters(text,0,text.length);
+				return elEndStart;
+			//}
+			
+		}
+	}
+	return elStartEnd+1;
+}
+function fixSelfClosed(source,elStartEnd,tagName,closeMap){
+	//if(tagName in closeMap){
+	var pos = closeMap[tagName];
+	if(pos == null){
+		//console.log(tagName)
+		pos =  source.lastIndexOf('</'+tagName+'>')
+		if(pos<elStartEnd){//忘记闭合
+			pos = source.lastIndexOf('</'+tagName)
+		}
+		closeMap[tagName] =pos
+	}
+	return pos<elStartEnd;
+	//} 
+}
+function _copy(source,target){
+	for(var n in source){target[n] = source[n]}
+}
+function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
+	var next= source.charAt(start+2)
+	switch(next){
+	case '-':
+		if(source.charAt(start + 3) === '-'){
+			var end = source.indexOf('-->',start+4);
+			//append comment source.substring(4,end)//<!--
+			if(end>start){
+				domBuilder.comment(source,start+4,end-start-4);
+				return end+3;
+			}else{
+				errorHandler.error("Unclosed comment");
+				return -1;
+			}
+		}else{
+			//error
+			return -1;
+		}
+	default:
+		if(source.substr(start+3,6) == 'CDATA['){
+			var end = source.indexOf(']]>',start+9);
+			domBuilder.startCDATA();
+			domBuilder.characters(source,start+9,end-start-9);
+			domBuilder.endCDATA() 
+			return end+3;
+		}
+		//<!DOCTYPE
+		//startDTD(java.lang.String name, java.lang.String publicId, java.lang.String systemId) 
+		var matchs = split(source,start);
+		var len = matchs.length;
+		if(len>1 && /!doctype/i.test(matchs[0][0])){
+			var name = matchs[1][0];
+			var pubid = false;
+			var sysid = false;
+			if(len>3){
+				if(/^public$/i.test(matchs[2][0])){
+					pubid = matchs[3][0];
+					sysid = len>4 && matchs[4][0];
+				}else if(/^system$/i.test(matchs[2][0])){
+					sysid = matchs[3][0];
+				}
+			}
+			var lastMatch = matchs[len-1]
+			domBuilder.startDTD(name, pubid, sysid);
+			domBuilder.endDTD();
+			
+			return lastMatch.index+lastMatch[0].length
+		}
+	}
+	return -1;
+}
+
+
+
+function parseInstruction(source,start,domBuilder){
+	var end = source.indexOf('?>',start);
+	if(end){
+		var match = source.substring(start,end).match(/^<\?(\S*)\s*([\s\S]*?)\s*$/);
+		if(match){
+			var len = match[0].length;
+			domBuilder.processingInstruction(match[1], match[2]) ;
+			return end+2;
+		}else{//error
+			return -1;
+		}
+	}
+	return -1;
+}
+
+function ElementAttributes(){
+	this.attributeNames = {}
+}
+ElementAttributes.prototype = {
+	setTagName:function(tagName){
+		if(!tagNamePattern.test(tagName)){
+			throw new Error('invalid tagName:'+tagName)
+		}
+		this.tagName = tagName
+	},
+	addValue:function(qName, value, offset) {
+		if(!tagNamePattern.test(qName)){
+			throw new Error('invalid attribute:'+qName)
+		}
+		this.attributeNames[qName] = this.length;
+		this[this.length++] = {qName:qName,value:value,offset:offset}
+	},
+	length:0,
+	getLocalName:function(i){return this[i].localName},
+	getLocator:function(i){return this[i].locator},
+	getQName:function(i){return this[i].qName},
+	getURI:function(i){return this[i].uri},
+	getValue:function(i){return this[i].value}
+//	,getIndex:function(uri, localName)){
+//		if(localName){
+//			
+//		}else{
+//			var qName = uri
+//		}
+//	},
+//	getValue:function(){return this.getValue(this.getIndex.apply(this,arguments))},
+//	getType:function(uri,localName){}
+//	getType:function(i){},
+}
+
+
+
+function split(source,start){
+	var match;
+	var buf = [];
+	var reg = /'[^']+'|"[^"]+"|[^\s<>\/=]+=?|(\/?\s*>|<)/g;
+	reg.lastIndex = start;
+	reg.exec(source);//skip <
+	while(match = reg.exec(source)){
+		buf.push(match);
+		if(match[1])return buf;
+	}
+}
+
+exports.XMLReader = XMLReader;
+exports.ParseError = ParseError;
+
+
+/***/ }),
+
+/***/ 357:
+/***/ (function(module) {
+
+module.exports = require("assert");
+
+/***/ }),
+
+/***/ 413:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+module.exports = __webpack_require__(141);
+
+
+/***/ }),
+
+/***/ 425:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.HttpClient = exports.isHttps = exports.HttpClientResponse = exports.HttpClientError = exports.getProxyUrl = exports.MediaTypes = exports.Headers = exports.HttpCodes = void 0;
+const http = __importStar(__webpack_require__(605));
+const https = __importStar(__webpack_require__(211));
+const pm = __importStar(__webpack_require__(177));
+const tunnel = __importStar(__webpack_require__(413));
+var HttpCodes;
+(function (HttpCodes) {
+    HttpCodes[HttpCodes["OK"] = 200] = "OK";
+    HttpCodes[HttpCodes["MultipleChoices"] = 300] = "MultipleChoices";
+    HttpCodes[HttpCodes["MovedPermanently"] = 301] = "MovedPermanently";
+    HttpCodes[HttpCodes["ResourceMoved"] = 302] = "ResourceMoved";
+    HttpCodes[HttpCodes["SeeOther"] = 303] = "SeeOther";
+    HttpCodes[HttpCodes["NotModified"] = 304] = "NotModified";
+    HttpCodes[HttpCodes["UseProxy"] = 305] = "UseProxy";
+    HttpCodes[HttpCodes["SwitchProxy"] = 306] = "SwitchProxy";
+    HttpCodes[HttpCodes["TemporaryRedirect"] = 307] = "TemporaryRedirect";
+    HttpCodes[HttpCodes["PermanentRedirect"] = 308] = "PermanentRedirect";
+    HttpCodes[HttpCodes["BadRequest"] = 400] = "BadRequest";
+    HttpCodes[HttpCodes["Unauthorized"] = 401] = "Unauthorized";
+    HttpCodes[HttpCodes["PaymentRequired"] = 402] = "PaymentRequired";
+    HttpCodes[HttpCodes["Forbidden"] = 403] = "Forbidden";
+    HttpCodes[HttpCodes["NotFound"] = 404] = "NotFound";
+    HttpCodes[HttpCodes["MethodNotAllowed"] = 405] = "MethodNotAllowed";
+    HttpCodes[HttpCodes["NotAcceptable"] = 406] = "NotAcceptable";
+    HttpCodes[HttpCodes["ProxyAuthenticationRequired"] = 407] = "ProxyAuthenticationRequired";
+    HttpCodes[HttpCodes["RequestTimeout"] = 408] = "RequestTimeout";
+    HttpCodes[HttpCodes["Conflict"] = 409] = "Conflict";
+    HttpCodes[HttpCodes["Gone"] = 410] = "Gone";
+    HttpCodes[HttpCodes["TooManyRequests"] = 429] = "TooManyRequests";
+    HttpCodes[HttpCodes["InternalServerError"] = 500] = "InternalServerError";
+    HttpCodes[HttpCodes["NotImplemented"] = 501] = "NotImplemented";
+    HttpCodes[HttpCodes["BadGateway"] = 502] = "BadGateway";
+    HttpCodes[HttpCodes["ServiceUnavailable"] = 503] = "ServiceUnavailable";
+    HttpCodes[HttpCodes["GatewayTimeout"] = 504] = "GatewayTimeout";
+})(HttpCodes = exports.HttpCodes || (exports.HttpCodes = {}));
+var Headers;
+(function (Headers) {
+    Headers["Accept"] = "accept";
+    Headers["ContentType"] = "content-type";
+})(Headers = exports.Headers || (exports.Headers = {}));
+var MediaTypes;
+(function (MediaTypes) {
+    MediaTypes["ApplicationJson"] = "application/json";
+})(MediaTypes = exports.MediaTypes || (exports.MediaTypes = {}));
+/**
+ * Returns the proxy URL, depending upon the supplied url and proxy environment variables.
+ * @param serverUrl  The server URL where the request will be sent. For example, https://api.github.com
+ */
+function getProxyUrl(serverUrl) {
+    const proxyUrl = pm.getProxyUrl(new URL(serverUrl));
+    return proxyUrl ? proxyUrl.href : '';
+}
+exports.getProxyUrl = getProxyUrl;
+const HttpRedirectCodes = [
+    HttpCodes.MovedPermanently,
+    HttpCodes.ResourceMoved,
+    HttpCodes.SeeOther,
+    HttpCodes.TemporaryRedirect,
+    HttpCodes.PermanentRedirect
+];
+const HttpResponseRetryCodes = [
+    HttpCodes.BadGateway,
+    HttpCodes.ServiceUnavailable,
+    HttpCodes.GatewayTimeout
+];
+const RetryableHttpVerbs = ['OPTIONS', 'GET', 'DELETE', 'HEAD'];
+const ExponentialBackoffCeiling = 10;
+const ExponentialBackoffTimeSlice = 5;
+class HttpClientError extends Error {
+    constructor(message, statusCode) {
+        super(message);
+        this.name = 'HttpClientError';
+        this.statusCode = statusCode;
+        Object.setPrototypeOf(this, HttpClientError.prototype);
+    }
+}
+exports.HttpClientError = HttpClientError;
+class HttpClientResponse {
+    constructor(message) {
+        this.message = message;
+    }
+    readBody() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve) => __awaiter(this, void 0, void 0, function* () {
+                let output = Buffer.alloc(0);
+                this.message.on('data', (chunk) => {
+                    output = Buffer.concat([output, chunk]);
+                });
+                this.message.on('end', () => {
+                    resolve(output.toString());
+                });
+            }));
+        });
+    }
+}
+exports.HttpClientResponse = HttpClientResponse;
+function isHttps(requestUrl) {
+    const parsedUrl = new URL(requestUrl);
+    return parsedUrl.protocol === 'https:';
+}
+exports.isHttps = isHttps;
+class HttpClient {
+    constructor(userAgent, handlers, requestOptions) {
+        this._ignoreSslError = false;
+        this._allowRedirects = true;
+        this._allowRedirectDowngrade = false;
+        this._maxRedirects = 50;
+        this._allowRetries = false;
+        this._maxRetries = 1;
+        this._keepAlive = false;
+        this._disposed = false;
+        this.userAgent = userAgent;
+        this.handlers = handlers || [];
+        this.requestOptions = requestOptions;
+        if (requestOptions) {
+            if (requestOptions.ignoreSslError != null) {
+                this._ignoreSslError = requestOptions.ignoreSslError;
+            }
+            this._socketTimeout = requestOptions.socketTimeout;
+            if (requestOptions.allowRedirects != null) {
+                this._allowRedirects = requestOptions.allowRedirects;
+            }
+            if (requestOptions.allowRedirectDowngrade != null) {
+                this._allowRedirectDowngrade = requestOptions.allowRedirectDowngrade;
+            }
+            if (requestOptions.maxRedirects != null) {
+                this._maxRedirects = Math.max(requestOptions.maxRedirects, 0);
+            }
+            if (requestOptions.keepAlive != null) {
+                this._keepAlive = requestOptions.keepAlive;
+            }
+            if (requestOptions.allowRetries != null) {
+                this._allowRetries = requestOptions.allowRetries;
+            }
+            if (requestOptions.maxRetries != null) {
+                this._maxRetries = requestOptions.maxRetries;
+            }
+        }
+    }
+    options(requestUrl, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('OPTIONS', requestUrl, null, additionalHeaders || {});
+        });
+    }
+    get(requestUrl, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('GET', requestUrl, null, additionalHeaders || {});
+        });
+    }
+    del(requestUrl, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('DELETE', requestUrl, null, additionalHeaders || {});
+        });
+    }
+    post(requestUrl, data, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('POST', requestUrl, data, additionalHeaders || {});
+        });
+    }
+    patch(requestUrl, data, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('PATCH', requestUrl, data, additionalHeaders || {});
+        });
+    }
+    put(requestUrl, data, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('PUT', requestUrl, data, additionalHeaders || {});
+        });
+    }
+    head(requestUrl, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request('HEAD', requestUrl, null, additionalHeaders || {});
+        });
+    }
+    sendStream(verb, requestUrl, stream, additionalHeaders) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.request(verb, requestUrl, stream, additionalHeaders);
+        });
+    }
+    /**
+     * Gets a typed object from an endpoint
+     * Be aware that not found returns a null.  Other errors (4xx, 5xx) reject the promise
+     */
+    getJson(requestUrl, additionalHeaders = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+            const res = yield this.get(requestUrl, additionalHeaders);
+            return this._processResponse(res, this.requestOptions);
+        });
+    }
+    postJson(requestUrl, obj, additionalHeaders = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const data = JSON.stringify(obj, null, 2);
+            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[Headers.ContentType] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.ContentType, MediaTypes.ApplicationJson);
+            const res = yield this.post(requestUrl, data, additionalHeaders);
+            return this._processResponse(res, this.requestOptions);
+        });
+    }
+    putJson(requestUrl, obj, additionalHeaders = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const data = JSON.stringify(obj, null, 2);
+            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[Headers.ContentType] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.ContentType, MediaTypes.ApplicationJson);
+            const res = yield this.put(requestUrl, data, additionalHeaders);
+            return this._processResponse(res, this.requestOptions);
+        });
+    }
+    patchJson(requestUrl, obj, additionalHeaders = {}) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const data = JSON.stringify(obj, null, 2);
+            additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+            additionalHeaders[Headers.ContentType] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.ContentType, MediaTypes.ApplicationJson);
+            const res = yield this.patch(requestUrl, data, additionalHeaders);
+            return this._processResponse(res, this.requestOptions);
+        });
+    }
+    /**
+     * Makes a raw http request.
+     * All other methods such as get, post, patch, and request ultimately call this.
+     * Prefer get, del, post and patch
+     */
+    request(verb, requestUrl, data, headers) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this._disposed) {
+                throw new Error('Client has already been disposed.');
+            }
+            const parsedUrl = new URL(requestUrl);
+            let info = this._prepareRequest(verb, parsedUrl, headers);
+            // Only perform retries on reads since writes may not be idempotent.
+            const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb)
+                ? this._maxRetries + 1
+                : 1;
+            let numTries = 0;
+            let response;
+            do {
+                response = yield this.requestRaw(info, data);
+                // Check if it's an authentication challenge
+                if (response &&
+                    response.message &&
+                    response.message.statusCode === HttpCodes.Unauthorized) {
+                    let authenticationHandler;
+                    for (const handler of this.handlers) {
+                        if (handler.canHandleAuthentication(response)) {
+                            authenticationHandler = handler;
+                            break;
+                        }
+                    }
+                    if (authenticationHandler) {
+                        return authenticationHandler.handleAuthentication(this, info, data);
+                    }
+                    else {
+                        // We have received an unauthorized response but have no handlers to handle it.
+                        // Let the response return to the caller.
+                        return response;
+                    }
+                }
+                let redirectsRemaining = this._maxRedirects;
+                while (response.message.statusCode &&
+                    HttpRedirectCodes.includes(response.message.statusCode) &&
+                    this._allowRedirects &&
+                    redirectsRemaining > 0) {
+                    const redirectUrl = response.message.headers['location'];
+                    if (!redirectUrl) {
+                        // if there's no location to redirect to, we won't
+                        break;
+                    }
+                    const parsedRedirectUrl = new URL(redirectUrl);
+                    if (parsedUrl.protocol === 'https:' &&
+                        parsedUrl.protocol !== parsedRedirectUrl.protocol &&
+                        !this._allowRedirectDowngrade) {
+                        throw new Error('Redirect from HTTPS to HTTP protocol. This downgrade is not allowed for security reasons. If you want to allow this behavior, set the allowRedirectDowngrade option to true.');
+                    }
+                    // we need to finish reading the response before reassigning response
+                    // which will leak the open socket.
+                    yield response.readBody();
+                    // strip authorization header if redirected to a different hostname
+                    if (parsedRedirectUrl.hostname !== parsedUrl.hostname) {
+                        for (const header in headers) {
+                            // header names are case insensitive
+                            if (header.toLowerCase() === 'authorization') {
+                                delete headers[header];
+                            }
+                        }
+                    }
+                    // let's make the request with the new redirectUrl
+                    info = this._prepareRequest(verb, parsedRedirectUrl, headers);
+                    response = yield this.requestRaw(info, data);
+                    redirectsRemaining--;
+                }
+                if (!response.message.statusCode ||
+                    !HttpResponseRetryCodes.includes(response.message.statusCode)) {
+                    // If not a retry code, return immediately instead of retrying
+                    return response;
+                }
+                numTries += 1;
+                if (numTries < maxTries) {
+                    yield response.readBody();
+                    yield this._performExponentialBackoff(numTries);
+                }
+            } while (numTries < maxTries);
+            return response;
+        });
+    }
+    /**
+     * Needs to be called if keepAlive is set to true in request options.
+     */
+    dispose() {
+        if (this._agent) {
+            this._agent.destroy();
+        }
+        this._disposed = true;
+    }
+    /**
+     * Raw request.
+     * @param info
+     * @param data
+     */
+    requestRaw(info, data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => {
+                function callbackForResult(err, res) {
+                    if (err) {
+                        reject(err);
+                    }
+                    else if (!res) {
+                        // If `err` is not passed, then `res` must be passed.
+                        reject(new Error('Unknown error'));
+                    }
+                    else {
+                        resolve(res);
+                    }
+                }
+                this.requestRawWithCallback(info, data, callbackForResult);
+            });
+        });
+    }
+    /**
+     * Raw request with callback.
+     * @param info
+     * @param data
+     * @param onResult
+     */
+    requestRawWithCallback(info, data, onResult) {
+        if (typeof data === 'string') {
+            if (!info.options.headers) {
+                info.options.headers = {};
+            }
+            info.options.headers['Content-Length'] = Buffer.byteLength(data, 'utf8');
+        }
+        let callbackCalled = false;
+        function handleResult(err, res) {
+            if (!callbackCalled) {
+                callbackCalled = true;
+                onResult(err, res);
+            }
+        }
+        const req = info.httpModule.request(info.options, (msg) => {
+            const res = new HttpClientResponse(msg);
+            handleResult(undefined, res);
+        });
+        let socket;
+        req.on('socket', sock => {
+            socket = sock;
+        });
+        // If we ever get disconnected, we want the socket to timeout eventually
+        req.setTimeout(this._socketTimeout || 3 * 60000, () => {
+            if (socket) {
+                socket.end();
+            }
+            handleResult(new Error(`Request timeout: ${info.options.path}`));
+        });
+        req.on('error', function (err) {
+            // err has statusCode property
+            // res should have headers
+            handleResult(err);
+        });
+        if (data && typeof data === 'string') {
+            req.write(data, 'utf8');
+        }
+        if (data && typeof data !== 'string') {
+            data.on('close', function () {
+                req.end();
+            });
+            data.pipe(req);
+        }
+        else {
+            req.end();
+        }
+    }
+    /**
+     * Gets an http agent. This function is useful when you need an http agent that handles
+     * routing through a proxy server - depending upon the url and proxy environment variables.
+     * @param serverUrl  The server URL where the request will be sent. For example, https://api.github.com
+     */
+    getAgent(serverUrl) {
+        const parsedUrl = new URL(serverUrl);
+        return this._getAgent(parsedUrl);
+    }
+    _prepareRequest(method, requestUrl, headers) {
+        const info = {};
+        info.parsedUrl = requestUrl;
+        const usingSsl = info.parsedUrl.protocol === 'https:';
+        info.httpModule = usingSsl ? https : http;
+        const defaultPort = usingSsl ? 443 : 80;
+        info.options = {};
+        info.options.host = info.parsedUrl.hostname;
+        info.options.port = info.parsedUrl.port
+            ? parseInt(info.parsedUrl.port)
+            : defaultPort;
+        info.options.path =
+            (info.parsedUrl.pathname || '') + (info.parsedUrl.search || '');
+        info.options.method = method;
+        info.options.headers = this._mergeHeaders(headers);
+        if (this.userAgent != null) {
+            info.options.headers['user-agent'] = this.userAgent;
+        }
+        info.options.agent = this._getAgent(info.parsedUrl);
+        // gives handlers an opportunity to participate
+        if (this.handlers) {
+            for (const handler of this.handlers) {
+                handler.prepareRequest(info.options);
+            }
+        }
+        return info;
+    }
+    _mergeHeaders(headers) {
+        if (this.requestOptions && this.requestOptions.headers) {
+            return Object.assign({}, lowercaseKeys(this.requestOptions.headers), lowercaseKeys(headers || {}));
+        }
+        return lowercaseKeys(headers || {});
+    }
+    _getExistingOrDefaultHeader(additionalHeaders, header, _default) {
+        let clientHeader;
+        if (this.requestOptions && this.requestOptions.headers) {
+            clientHeader = lowercaseKeys(this.requestOptions.headers)[header];
+        }
+        return additionalHeaders[header] || clientHeader || _default;
+    }
+    _getAgent(parsedUrl) {
+        let agent;
+        const proxyUrl = pm.getProxyUrl(parsedUrl);
+        const useProxy = proxyUrl && proxyUrl.hostname;
+        if (this._keepAlive && useProxy) {
+            agent = this._proxyAgent;
+        }
+        if (this._keepAlive && !useProxy) {
+            agent = this._agent;
+        }
+        // if agent is already assigned use that agent.
+        if (agent) {
+            return agent;
+        }
+        const usingSsl = parsedUrl.protocol === 'https:';
+        let maxSockets = 100;
+        if (this.requestOptions) {
+            maxSockets = this.requestOptions.maxSockets || http.globalAgent.maxSockets;
+        }
+        // This is `useProxy` again, but we need to check `proxyURl` directly for TypeScripts's flow analysis.
+        if (proxyUrl && proxyUrl.hostname) {
+            const agentOptions = {
+                maxSockets,
+                keepAlive: this._keepAlive,
+                proxy: Object.assign(Object.assign({}, ((proxyUrl.username || proxyUrl.password) && {
+                    proxyAuth: `${proxyUrl.username}:${proxyUrl.password}`
+                })), { host: proxyUrl.hostname, port: proxyUrl.port })
+            };
+            let tunnelAgent;
+            const overHttps = proxyUrl.protocol === 'https:';
+            if (usingSsl) {
+                tunnelAgent = overHttps ? tunnel.httpsOverHttps : tunnel.httpsOverHttp;
+            }
+            else {
+                tunnelAgent = overHttps ? tunnel.httpOverHttps : tunnel.httpOverHttp;
+            }
+            agent = tunnelAgent(agentOptions);
+            this._proxyAgent = agent;
+        }
+        // if reusing agent across request and tunneling agent isn't assigned create a new agent
+        if (this._keepAlive && !agent) {
+            const options = { keepAlive: this._keepAlive, maxSockets };
+            agent = usingSsl ? new https.Agent(options) : new http.Agent(options);
+            this._agent = agent;
+        }
+        // if not using private agent and tunnel agent isn't setup then use global agent
+        if (!agent) {
+            agent = usingSsl ? https.globalAgent : http.globalAgent;
+        }
+        if (usingSsl && this._ignoreSslError) {
+            // we don't want to set NODE_TLS_REJECT_UNAUTHORIZED=0 since that will affect request for entire process
+            // http.RequestOptions doesn't expose a way to modify RequestOptions.agent.options
+            // we have to cast it to any and change it directly
+            agent.options = Object.assign(agent.options || {}, {
+                rejectUnauthorized: false
+            });
+        }
+        return agent;
+    }
+    _performExponentialBackoff(retryNumber) {
+        return __awaiter(this, void 0, void 0, function* () {
+            retryNumber = Math.min(ExponentialBackoffCeiling, retryNumber);
+            const ms = ExponentialBackoffTimeSlice * Math.pow(2, retryNumber);
+            return new Promise(resolve => setTimeout(() => resolve(), ms));
+        });
+    }
+    _processResponse(res, options) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                const statusCode = res.message.statusCode || 0;
+                const response = {
+                    statusCode,
+                    result: null,
+                    headers: {}
+                };
+                // not found leads to null obj returned
+                if (statusCode === HttpCodes.NotFound) {
+                    resolve(response);
+                }
+                // get the result from the body
+                function dateTimeDeserializer(key, value) {
+                    if (typeof value === 'string') {
+                        const a = new Date(value);
+                        if (!isNaN(a.valueOf())) {
+                            return a;
+                        }
+                    }
+                    return value;
+                }
+                let obj;
+                let contents;
+                try {
+                    contents = yield res.readBody();
+                    if (contents && contents.length > 0) {
+                        if (options && options.deserializeDates) {
+                            obj = JSON.parse(contents, dateTimeDeserializer);
+                        }
+                        else {
+                            obj = JSON.parse(contents);
+                        }
+                        response.result = obj;
+                    }
+                    response.headers = res.message.headers;
+                }
+                catch (err) {
+                    // Invalid resource (contents not json);  leaving result obj null
+                }
+                // note that 3xx redirects are handled by the http layer.
+                if (statusCode > 299) {
+                    let msg;
+                    // if exception/error in body, attempt to get better error
+                    if (obj && obj.message) {
+                        msg = obj.message;
+                    }
+                    else if (contents && contents.length > 0) {
+                        // it may be the case that the exception is in the body message as string
+                        msg = contents;
+                    }
+                    else {
+                        msg = `Failed request: (${statusCode})`;
+                    }
+                    const err = new HttpClientError(msg, statusCode);
+                    err.result = response.result;
+                    reject(err);
+                }
+                else {
+                    resolve(response);
+                }
+            }));
+        });
+    }
+}
+exports.HttpClient = HttpClient;
+const lowercaseKeys = (obj) => Object.keys(obj).reduce((c, k) => ((c[k.toLowerCase()] = obj[k]), c), {});
+//# sourceMappingURL=index.js.map
 
 /***/ }),
 
@@ -225,14 +2157,413 @@ function escapeProperty(s) {
 
 /***/ }),
 
-/***/ 440:
-/***/ (function(__unusedmodule, exports) {
+/***/ 470:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
+const command_1 = __webpack_require__(431);
+const file_command_1 = __webpack_require__(102);
+const utils_1 = __webpack_require__(82);
+const os = __importStar(__webpack_require__(87));
+const path = __importStar(__webpack_require__(622));
+const oidc_utils_1 = __webpack_require__(742);
+/**
+ * The code to exit an action
+ */
+var ExitCode;
+(function (ExitCode) {
+    /**
+     * A code indicating that the action was successful
+     */
+    ExitCode[ExitCode["Success"] = 0] = "Success";
+    /**
+     * A code indicating that the action was a failure
+     */
+    ExitCode[ExitCode["Failure"] = 1] = "Failure";
+})(ExitCode = exports.ExitCode || (exports.ExitCode = {}));
+//-----------------------------------------------------------------------
+// Variables
+//-----------------------------------------------------------------------
+/**
+ * Sets env variable for this action and future actions in the job
+ * @param name the name of the variable to set
+ * @param val the value of the variable. Non-string values will be converted to a string via JSON.stringify
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function exportVariable(name, val) {
+    const convertedVal = utils_1.toCommandValue(val);
+    process.env[name] = convertedVal;
+    const filePath = process.env['GITHUB_ENV'] || '';
+    if (filePath) {
+        const delimiter = '_GitHubActionsFileCommandDelimeter_';
+        const commandValue = `${name}<<${delimiter}${os.EOL}${convertedVal}${os.EOL}${delimiter}`;
+        file_command_1.issueCommand('ENV', commandValue);
+    }
+    else {
+        command_1.issueCommand('set-env', { name }, convertedVal);
+    }
+}
+exports.exportVariable = exportVariable;
+/**
+ * Registers a secret which will get masked from logs
+ * @param secret value of the secret
+ */
+function setSecret(secret) {
+    command_1.issueCommand('add-mask', {}, secret);
+}
+exports.setSecret = setSecret;
+/**
+ * Prepends inputPath to the PATH (for this action and future actions)
+ * @param inputPath
+ */
+function addPath(inputPath) {
+    const filePath = process.env['GITHUB_PATH'] || '';
+    if (filePath) {
+        file_command_1.issueCommand('PATH', inputPath);
+    }
+    else {
+        command_1.issueCommand('add-path', {}, inputPath);
+    }
+    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
+}
+exports.addPath = addPath;
+/**
+ * Gets the value of an input.
+ * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
+ * Returns an empty string if the value is not defined.
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   string
+ */
+function getInput(name, options) {
+    const val = process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
+    if (options && options.required && !val) {
+        throw new Error(`Input required and not supplied: ${name}`);
+    }
+    if (options && options.trimWhitespace === false) {
+        return val;
+    }
+    return val.trim();
+}
+exports.getInput = getInput;
+/**
+ * Gets the values of an multiline input.  Each value is also trimmed.
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   string[]
+ *
+ */
+function getMultilineInput(name, options) {
+    const inputs = getInput(name, options)
+        .split('\n')
+        .filter(x => x !== '');
+    return inputs;
+}
+exports.getMultilineInput = getMultilineInput;
+/**
+ * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
+ * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
+ * The return value is also in boolean type.
+ * ref: https://yaml.org/spec/1.2/spec.html#id2804923
+ *
+ * @param     name     name of the input to get
+ * @param     options  optional. See InputOptions.
+ * @returns   boolean
+ */
+function getBooleanInput(name, options) {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    const val = getInput(name, options);
+    if (trueValue.includes(val))
+        return true;
+    if (falseValue.includes(val))
+        return false;
+    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+exports.getBooleanInput = getBooleanInput;
+/**
+ * Sets the value of an output.
+ *
+ * @param     name     name of the output to set
+ * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setOutput(name, value) {
+    process.stdout.write(os.EOL);
+    command_1.issueCommand('set-output', { name }, value);
+}
+exports.setOutput = setOutput;
+/**
+ * Enables or disables the echoing of commands into stdout for the rest of the step.
+ * Echoing is disabled by default if ACTIONS_STEP_DEBUG is not set.
+ *
+ */
+function setCommandEcho(enabled) {
+    command_1.issue('echo', enabled ? 'on' : 'off');
+}
+exports.setCommandEcho = setCommandEcho;
+//-----------------------------------------------------------------------
+// Results
+//-----------------------------------------------------------------------
+/**
+ * Sets the action status to failed.
+ * When the action exits it will be with an exit code of 1
+ * @param message add error issue message
+ */
+function setFailed(message) {
+    process.exitCode = ExitCode.Failure;
+    error(message);
+}
+exports.setFailed = setFailed;
+//-----------------------------------------------------------------------
+// Logging Commands
+//-----------------------------------------------------------------------
+/**
+ * Gets whether Actions Step Debug is on or not
+ */
+function isDebug() {
+    return process.env['RUNNER_DEBUG'] === '1';
+}
+exports.isDebug = isDebug;
+/**
+ * Writes debug message to user log
+ * @param message debug message
+ */
+function debug(message) {
+    command_1.issueCommand('debug', {}, message);
+}
+exports.debug = debug;
+/**
+ * Adds an error issue
+ * @param message error issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function error(message, properties = {}) {
+    command_1.issueCommand('error', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.error = error;
+/**
+ * Adds a warning issue
+ * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function warning(message, properties = {}) {
+    command_1.issueCommand('warning', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.warning = warning;
+/**
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function notice(message, properties = {}) {
+    command_1.issueCommand('notice', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.notice = notice;
+/**
+ * Writes info to log with console.log.
+ * @param message info message
+ */
+function info(message) {
+    process.stdout.write(message + os.EOL);
+}
+exports.info = info;
+/**
+ * Begin an output group.
+ *
+ * Output until the next `groupEnd` will be foldable in this group
+ *
+ * @param name The name of the output group
+ */
+function startGroup(name) {
+    command_1.issue('group', name);
+}
+exports.startGroup = startGroup;
+/**
+ * End an output group.
+ */
+function endGroup() {
+    command_1.issue('endgroup');
+}
+exports.endGroup = endGroup;
+/**
+ * Wrap an asynchronous function call in a group.
+ *
+ * Returns the same type as the function itself.
+ *
+ * @param name The name of the group
+ * @param fn The function to wrap in the group
+ */
+function group(name, fn) {
+    return __awaiter(this, void 0, void 0, function* () {
+        startGroup(name);
+        let result;
+        try {
+            result = yield fn();
+        }
+        finally {
+            endGroup();
+        }
+        return result;
+    });
+}
+exports.group = group;
+//-----------------------------------------------------------------------
+// Wrapper action state
+//-----------------------------------------------------------------------
+/**
+ * Saves state for current action, the state can only be retrieved by this action's post job execution.
+ *
+ * @param     name     name of the state to store
+ * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function saveState(name, value) {
+    command_1.issueCommand('save-state', { name }, value);
+}
+exports.saveState = saveState;
+/**
+ * Gets the value of an state set by this action's main execution.
+ *
+ * @param     name     name of the state to get
+ * @returns   string
+ */
+function getState(name) {
+    return process.env[`STATE_${name}`] || '';
+}
+exports.getState = getState;
+function getIDToken(aud) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield oidc_utils_1.OidcClient.getIDToken(aud);
+    });
+}
+exports.getIDToken = getIDToken;
+/**
+ * Summary exports
+ */
+var summary_1 = __webpack_require__(665);
+Object.defineProperty(exports, "summary", { enumerable: true, get: function () { return summary_1.summary; } });
+/**
+ * @deprecated use core.summary
+ */
+var summary_2 = __webpack_require__(665);
+Object.defineProperty(exports, "markdownSummary", { enumerable: true, get: function () { return summary_2.markdownSummary; } });
+/**
+ * Path exports
+ */
+var path_utils_1 = __webpack_require__(573);
+Object.defineProperty(exports, "toPosixPath", { enumerable: true, get: function () { return path_utils_1.toPosixPath; } });
+Object.defineProperty(exports, "toWin32Path", { enumerable: true, get: function () { return path_utils_1.toWin32Path; } });
+Object.defineProperty(exports, "toPlatformPath", { enumerable: true, get: function () { return path_utils_1.toPlatformPath; } });
+//# sourceMappingURL=core.js.map
+
+/***/ }),
+
+/***/ 476:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+var conventions = __webpack_require__(681);
+
+var NAMESPACE = conventions.NAMESPACE;
+
+/**
+ * A prerequisite for `[].filter`, to drop elements that are empty
+ * @param {string} input
+ * @returns {boolean}
+ */
+function notEmptyString (input) {
+	return input !== ''
+}
+/**
+ * @see https://infra.spec.whatwg.org/#split-on-ascii-whitespace
+ * @see https://infra.spec.whatwg.org/#ascii-whitespace
+ *
+ * @param {string} input
+ * @returns {string[]} (can be empty)
+ */
+function splitOnASCIIWhitespace(input) {
+	// U+0009 TAB, U+000A LF, U+000C FF, U+000D CR, U+0020 SPACE
+	return input ? input.split(/[\t\n\f\r ]+/).filter(notEmptyString) : []
+}
+
+/**
+ * Adds element as a key to current if it is not already present.
+ *
+ * @param {Record<string, boolean | undefined>} current
+ * @param {string} element
+ * @returns {Record<string, boolean | undefined>}
+ */
+function orderedSetReducer (current, element) {
+	if (!current.hasOwnProperty(element)) {
+		current[element] = true;
+	}
+	return current;
+}
+
+/**
+ * @see https://infra.spec.whatwg.org/#ordered-set
+ * @param {string} input
+ * @returns {string[]}
+ */
+function toOrderedSet(input) {
+	if (!input) return [];
+	var list = splitOnASCIIWhitespace(input);
+	return Object.keys(list.reduce(orderedSetReducer, {}))
+}
+
+/**
+ * Uses `list.indexOf` to implement something like `Array.prototype.includes`,
+ * which we can not rely on being available.
+ *
+ * @param {any[]} list
+ * @returns {function(any): boolean}
+ */
+function arrayIncludes (list) {
+	return function(element) {
+		return list && list.indexOf(element) !== -1;
+	}
+}
 
 function copy(src,dest){
 	for(var p in src){
 		dest[p] = src[p];
 	}
 }
+
 /**
 ^\w+\.prototype\.([_\w]+)\s*=\s*((?:.*\{\s*?[\r\n][\s\S]*?^})|\S.*?(?=[;\r\n]));?
 ^\w+\.prototype\.([_\w]+)\s*=\s*(\S.*?(?=[;\r\n]));?
@@ -248,12 +2579,12 @@ function _extends(Class,Super){
 	}
 	if(pt.constructor != Class){
 		if(typeof Class != 'function'){
-			console.error("unknow Class:"+Class)
+			console.error("unknown Class:"+Class)
 		}
 		pt.constructor = Class
 	}
 }
-var htmlns = 'http://www.w3.org/1999/xhtml' ;
+
 // Node Types
 var NodeType = {}
 var ELEMENT_NODE                = NodeType.ELEMENT_NODE                = 1;
@@ -310,6 +2641,7 @@ function DOMException(code, message) {
 };
 DOMException.prototype = Error.prototype;
 copy(ExceptionCode,DOMException)
+
 /**
  * @see http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/core.html#ID-536297177
  * The NodeList interface provides the abstraction of an ordered collection of nodes, without defining or constraining how this collection is implemented. NodeList objects in the DOM are live.
@@ -341,6 +2673,7 @@ NodeList.prototype = {
 		return buf.join('');
 	}
 };
+
 function LiveNodeList(node,refresh){
 	this._node = node;
 	this._refresh = refresh
@@ -362,9 +2695,15 @@ LiveNodeList.prototype.item = function(i){
 }
 
 _extends(LiveNodeList,NodeList);
+
 /**
- * 
- * Objects implementing the NamedNodeMap interface are used to represent collections of nodes that can be accessed by name. Note that NamedNodeMap does not inherit from NodeList; NamedNodeMaps are not maintained in any particular order. Objects contained in an object implementing NamedNodeMap may also be accessed by an ordinal index, but this is simply to allow convenient enumeration of the contents of a NamedNodeMap, and does not imply that the DOM specifies an order to these Nodes.
+ * Objects implementing the NamedNodeMap interface are used
+ * to represent collections of nodes that can be accessed by name.
+ * Note that NamedNodeMap does not inherit from NodeList;
+ * NamedNodeMaps are not maintained in any particular order.
+ * Objects contained in an object implementing NamedNodeMap may also be accessed by an ordinal index,
+ * but this is simply to allow convenient enumeration of the contents of a NamedNodeMap,
+ * and does not imply that the DOM specifies an order to these Nodes.
  * NamedNodeMap objects in the DOM are live.
  * used for attributes or DocumentType entities 
  */
@@ -476,55 +2815,108 @@ NamedNodeMap.prototype = {
 		return null;
 	}
 };
+
 /**
- * @see http://www.w3.org/TR/REC-DOM-Level-1/level-one-core.html#ID-102161490
+ * The DOMImplementation interface represents an object providing methods
+ * which are not dependent on any particular document.
+ * Such an object is returned by the `Document.implementation` property.
+ *
+ * __The individual methods describe the differences compared to the specs.__
+ *
+ * @constructor
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation MDN
+ * @see https://www.w3.org/TR/REC-DOM-Level-1/level-one-core.html#ID-102161490 DOM Level 1 Core (Initial)
+ * @see https://www.w3.org/TR/DOM-Level-2-Core/core.html#ID-102161490 DOM Level 2 Core
+ * @see https://www.w3.org/TR/DOM-Level-3-Core/core.html#ID-102161490 DOM Level 3 Core
+ * @see https://dom.spec.whatwg.org/#domimplementation DOM Living Standard
  */
-function DOMImplementation(/* Object */ features) {
-	this._features = {};
-	if (features) {
-		for (var feature in features) {
-			 this._features = features[feature];
-		}
-	}
-};
+function DOMImplementation() {
+}
 
 DOMImplementation.prototype = {
-	hasFeature: function(/* string */ feature, /* string */ version) {
-		var versions = this._features[feature.toLowerCase()];
-		if (versions && (!version || version in versions)) {
+	/**
+	 * The DOMImplementation.hasFeature() method returns a Boolean flag indicating if a given feature is supported.
+	 * The different implementations fairly diverged in what kind of features were reported.
+	 * The latest version of the spec settled to force this method to always return true, where the functionality was accurate and in use.
+	 *
+	 * @deprecated It is deprecated and modern browsers return true in all cases.
+	 *
+	 * @param {string} feature
+	 * @param {string} [version]
+	 * @returns {boolean} always true
+	 *
+	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation/hasFeature MDN
+	 * @see https://www.w3.org/TR/REC-DOM-Level-1/level-one-core.html#ID-5CED94D7 DOM Level 1 Core
+	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-hasfeature DOM Living Standard
+	 */
+	hasFeature: function(feature, version) {
 			return true;
-		} else {
-			return false;
-		}
 	},
-	// Introduced in DOM Level 2:
-	createDocument:function(namespaceURI,  qualifiedName, doctype){// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR,WRONG_DOCUMENT_ERR
+	/**
+	 * Creates an XML Document object of the specified type with its document element.
+	 *
+	 * __It behaves slightly different from the description in the living standard__:
+	 * - There is no interface/class `XMLDocument`, it returns a `Document` instance.
+	 * - `contentType`, `encoding`, `mode`, `origin`, `url` fields are currently not declared.
+	 * - this implementation is not validating names or qualified names
+	 *   (when parsing XML strings, the SAX parser takes care of that)
+	 *
+	 * @param {string|null} namespaceURI
+	 * @param {string} qualifiedName
+	 * @param {DocumentType=null} doctype
+	 * @returns {Document}
+	 *
+	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation/createDocument MDN
+	 * @see https://www.w3.org/TR/DOM-Level-2-Core/core.html#Level-2-Core-DOM-createDocument DOM Level 2 Core (initial)
+	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-createdocument  DOM Level 2 Core
+	 *
+	 * @see https://dom.spec.whatwg.org/#validate-and-extract DOM: Validate and extract
+	 * @see https://www.w3.org/TR/xml/#NT-NameStartChar XML Spec: Names
+	 * @see https://www.w3.org/TR/xml-names/#ns-qualnames XML Namespaces: Qualified names
+	 */
+	createDocument: function(namespaceURI,  qualifiedName, doctype){
 		var doc = new Document();
 		doc.implementation = this;
 		doc.childNodes = new NodeList();
-		doc.doctype = doctype;
-		if(doctype){
+		doc.doctype = doctype || null;
+		if (doctype){
 			doc.appendChild(doctype);
 		}
-		if(qualifiedName){
-			var root = doc.createElementNS(namespaceURI,qualifiedName);
+		if (qualifiedName){
+			var root = doc.createElementNS(namespaceURI, qualifiedName);
 			doc.appendChild(root);
 		}
 		return doc;
 	},
-	// Introduced in DOM Level 2:
-	createDocumentType:function(qualifiedName, publicId, systemId){// raises:INVALID_CHARACTER_ERR,NAMESPACE_ERR
+	/**
+	 * Returns a doctype, with the given `qualifiedName`, `publicId`, and `systemId`.
+	 *
+	 * __This behavior is slightly different from the in the specs__:
+	 * - this implementation is not validating names or qualified names
+	 *   (when parsing XML strings, the SAX parser takes care of that)
+	 *
+	 * @param {string} qualifiedName
+	 * @param {string} [publicId]
+	 * @param {string} [systemId]
+	 * @returns {DocumentType} which can either be used with `DOMImplementation.createDocument` upon document creation
+	 * 				  or can be put into the document via methods like `Node.insertBefore()` or `Node.replaceChild()`
+	 *
+	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMImplementation/createDocumentType MDN
+	 * @see https://www.w3.org/TR/DOM-Level-2-Core/core.html#Level-2-Core-DOM-createDocType DOM Level 2 Core
+	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-createdocumenttype DOM Living Standard
+	 *
+	 * @see https://dom.spec.whatwg.org/#validate-and-extract DOM: Validate and extract
+	 * @see https://www.w3.org/TR/xml/#NT-NameStartChar XML Spec: Names
+	 * @see https://www.w3.org/TR/xml-names/#ns-qualnames XML Namespaces: Qualified names
+	 */
+	createDocumentType: function(qualifiedName, publicId, systemId){
 		var node = new DocumentType();
 		node.name = qualifiedName;
 		node.nodeName = qualifiedName;
-		node.publicId = publicId;
-		node.systemId = systemId;
-		// Introduced in DOM Level 2:
-		//readonly attribute DOMString        internalSubset;
-		
-		//TODO:..
-		//  readonly attribute NamedNodeMap     entities;
-		//  readonly attribute NamedNodeMap     notations;
+		node.publicId = publicId || '';
+		node.systemId = systemId || '';
+
 		return node;
 	}
 };
@@ -594,6 +2986,20 @@ Node.prototype = {
     hasAttributes:function(){
     	return this.attributes.length>0;
     },
+	/**
+	 * Look up the prefix associated to the given namespace URI, starting from this node.
+	 * **The default namespace declarations are ignored by this method.**
+	 * See Namespace Prefix Lookup for details on the algorithm used by this method.
+	 *
+	 * _Note: The implementation seems to be incomplete when compared to the algorithm described in the specs._
+	 *
+	 * @param {string | null} namespaceURI
+	 * @returns {string | null}
+	 * @see https://www.w3.org/TR/DOM-Level-3-Core/core.html#Node3-lookupNamespacePrefix
+	 * @see https://www.w3.org/TR/DOM-Level-3-Core/namespaces-algorithms.html#lookupNamespacePrefixAlgo
+	 * @see https://dom.spec.whatwg.org/#dom-node-lookupprefix
+	 * @see https://github.com/xmldom/xmldom/issues/322
+	 */
     lookupPrefix:function(namespaceURI){
     	var el = this;
     	while(el){
@@ -664,22 +3070,25 @@ function _visitNode(node,callback){
 
 function Document(){
 }
+
 function _onAddAttribute(doc,el,newAttr){
 	doc && doc._inc++;
 	var ns = newAttr.namespaceURI ;
-	if(ns == 'http://www.w3.org/2000/xmlns/'){
+	if(ns === NAMESPACE.XMLNS){
 		//update namespace
 		el._nsMap[newAttr.prefix?newAttr.localName:''] = newAttr.value
 	}
 }
+
 function _onRemoveAttribute(doc,el,newAttr,remove){
 	doc && doc._inc++;
 	var ns = newAttr.namespaceURI ;
-	if(ns == 'http://www.w3.org/2000/xmlns/'){
+	if(ns === NAMESPACE.XMLNS){
 		//update namespace
 		delete el._nsMap[newAttr.prefix?newAttr.localName:'']
 	}
 }
+
 function _onUpdateChild(doc,el,newChild){
 	if(doc && doc._inc){
 		doc._inc++;
@@ -792,11 +3201,17 @@ Document.prototype = {
 	//implementation : null,
 	nodeName :  '#document',
 	nodeType :  DOCUMENT_NODE,
+	/**
+	 * The DocumentType node of the document.
+	 *
+	 * @readonly
+	 * @type DocumentType
+	 */
 	doctype :  null,
 	documentElement :  null,
 	_inc : 1,
-	
-	insertBefore :  function(newChild, refChild){//raises 
+
+	insertBefore :  function(newChild, refChild){//raises
 		if(newChild.nodeType == DOCUMENT_FRAGMENT_NODE){
 			var child = newChild.firstChild;
 			while(child){
@@ -809,7 +3224,7 @@ Document.prototype = {
 		if(this.documentElement == null && newChild.nodeType == ELEMENT_NODE){
 			this.documentElement = newChild;
 		}
-		
+
 		return _insertBefore(this,newChild,refChild),(newChild.ownerDocument = this),newChild;
 	},
 	removeChild :  function(oldChild){
@@ -835,28 +3250,58 @@ Document.prototype = {
 		})
 		return rtv;
 	},
-	
-	getElementsByClassName: function(className) {
-		var pattern = new RegExp("(^|\\s)" + className + "(\\s|$)");
+
+	/**
+	 * The `getElementsByClassName` method of `Document` interface returns an array-like object
+	 * of all child elements which have **all** of the given class name(s).
+	 *
+	 * Returns an empty list if `classeNames` is an empty string or only contains HTML white space characters.
+	 *
+	 *
+	 * Warning: This is a live LiveNodeList.
+	 * Changes in the DOM will reflect in the array as the changes occur.
+	 * If an element selected by this array no longer qualifies for the selector,
+	 * it will automatically be removed. Be aware of this for iteration purposes.
+	 *
+	 * @param {string} classNames is a string representing the class name(s) to match; multiple class names are separated by (ASCII-)whitespace
+	 *
+	 * @see https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByClassName
+	 * @see https://dom.spec.whatwg.org/#concept-getelementsbyclassname
+	 */
+	getElementsByClassName: function(classNames) {
+		var classNamesSet = toOrderedSet(classNames)
 		return new LiveNodeList(this, function(base) {
 			var ls = [];
-			_visitNode(base.documentElement, function(node) {
-				if(node !== base && node.nodeType == ELEMENT_NODE) {
-					if(pattern.test(node.getAttribute('class'))) {
-						ls.push(node);
+			if (classNamesSet.length > 0) {
+				_visitNode(base.documentElement, function(node) {
+					if(node !== base && node.nodeType === ELEMENT_NODE) {
+						var nodeClassNames = node.getAttribute('class')
+						// can be null if the attribute does not exist
+						if (nodeClassNames) {
+							// before splitting and iterating just compare them for the most common case
+							var matches = classNames === nodeClassNames;
+							if (!matches) {
+								var nodeClassNamesSet = toOrderedSet(nodeClassNames)
+								matches = classNamesSet.every(arrayIncludes(nodeClassNamesSet))
+							}
+							if(matches) {
+								ls.push(node);
+							}
+						}
 					}
-				}
-			});
+				});
+			}
 			return ls;
 		});
 	},
-	
+
 	//document factory method:
 	createElement :	function(tagName){
 		var node = new Element();
 		node.ownerDocument = this;
 		node.nodeName = tagName;
 		node.tagName = tagName;
+		node.localName = tagName;
 		node.childNodes = new NodeList();
 		var attrs	= node.attributes = new NamedNodeMap();
 		attrs._ownerElement = node;
@@ -1174,36 +3619,49 @@ function nodeSerializeToString(isHtml,nodeFilter){
 	//console.log('###',this.nodeType,uri,prefix,buf.join(''))
 	return buf.join('');
 }
-function needNamespaceDefine(node,isHTML, visibleNamespaces) {
-	var prefix = node.prefix||'';
+
+function needNamespaceDefine(node, isHTML, visibleNamespaces) {
+	var prefix = node.prefix || '';
 	var uri = node.namespaceURI;
-	if (!prefix && !uri){
+	// According to [Namespaces in XML 1.0](https://www.w3.org/TR/REC-xml-names/#ns-using) ,
+	// and more specifically https://www.w3.org/TR/REC-xml-names/#nsc-NoPrefixUndecl :
+	// > In a namespace declaration for a prefix [...], the attribute value MUST NOT be empty.
+	// in a similar manner [Namespaces in XML 1.1](https://www.w3.org/TR/xml-names11/#ns-using)
+	// and more specifically https://www.w3.org/TR/xml-names11/#nsc-NSDeclared :
+	// > [...] Furthermore, the attribute value [...] must not be an empty string.
+	// so serializing empty namespace value like xmlns:ds="" would produce an invalid XML document.
+	if (!uri) {
 		return false;
 	}
-	if (prefix === "xml" && uri === "http://www.w3.org/XML/1998/namespace" 
-		|| uri == 'http://www.w3.org/2000/xmlns/'){
+	if (prefix === "xml" && uri === NAMESPACE.XML || uri === NAMESPACE.XMLNS) {
 		return false;
 	}
 	
 	var i = visibleNamespaces.length 
-	//console.log('@@@@',node.tagName,prefix,uri,visibleNamespaces)
 	while (i--) {
 		var ns = visibleNamespaces[i];
 		// get namespace prefix
-		//console.log(node.nodeType,node.tagName,ns.prefix,prefix)
-		if (ns.prefix == prefix){
-			return ns.namespace != uri;
+		if (ns.prefix === prefix) {
+			return ns.namespace !== uri;
 		}
 	}
-	//console.log(isHTML,uri,prefix=='')
-	//if(isHTML && prefix ==null && uri == 'http://www.w3.org/1999/xhtml'){
-	//	return false;
-	//}
-	//node.flag = '11111'
-	//console.error(3,true,node.flag,node.prefix,node.namespaceURI)
 	return true;
 }
+/**
+ * Well-formed constraint: No < in Attribute Values
+ * The replacement text of any entity referred to directly or indirectly in an attribute value must not contain a <.
+ * @see https://www.w3.org/TR/xml/#CleanAttrVals
+ * @see https://www.w3.org/TR/xml/#NT-AttValue
+ */
+function addSerializedAttribute(buf, qualifiedName, value) {
+	buf.push(' ', qualifiedName, '="', value.replace(/[<&"]/g,_xmlEncoder), '"')
+}
+
 function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
+	if (!visibleNamespaces) {
+		visibleNamespaces = [];
+	}
+
 	if(nodeFilter){
 		node = nodeFilter(node);
 		if(node){
@@ -1216,20 +3674,51 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 		}
 		//buf.sort.apply(attrs, attributeSorter);
 	}
+
 	switch(node.nodeType){
 	case ELEMENT_NODE:
-		if (!visibleNamespaces) visibleNamespaces = [];
-		var startVisibleNamespaces = visibleNamespaces.length;
 		var attrs = node.attributes;
 		var len = attrs.length;
 		var child = node.firstChild;
 		var nodeName = node.tagName;
 		
-		isHTML =  (htmlns === node.namespaceURI) ||isHTML 
-		buf.push('<',nodeName);
-		
-		
-		
+		isHTML = NAMESPACE.isHTML(node.namespaceURI) || isHTML
+
+		var prefixedNodeName = nodeName
+		if (!isHTML && !node.prefix && node.namespaceURI) {
+			var defaultNS
+			// lookup current default ns from `xmlns` attribute
+			for (var ai = 0; ai < attrs.length; ai++) {
+				if (attrs.item(ai).name === 'xmlns') {
+					defaultNS = attrs.item(ai).value
+					break
+				}
+			}
+			if (!defaultNS) {
+				// lookup current default ns in visibleNamespaces
+				for (var nsi = visibleNamespaces.length - 1; nsi >= 0; nsi--) {
+					var namespace = visibleNamespaces[nsi]
+					if (namespace.prefix === '' && namespace.namespace === node.namespaceURI) {
+						defaultNS = namespace.namespace
+						break
+					}
+				}
+			}
+			if (defaultNS !== node.namespaceURI) {
+				for (var nsi = visibleNamespaces.length - 1; nsi >= 0; nsi--) {
+					var namespace = visibleNamespaces[nsi]
+					if (namespace.namespace === node.namespaceURI) {
+						if (namespace.prefix) {
+							prefixedNodeName = namespace.prefix + ':' + nodeName
+						}
+						break
+					}
+				}
+			}
+		}
+
+		buf.push('<', prefixedNodeName);
+
 		for(var i=0;i<len;i++){
 			// add namespaces for attributes
 			var attr = attrs.item(i);
@@ -1239,23 +3728,23 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 				visibleNamespaces.push({ prefix: '', namespace: attr.value });
 			}
 		}
+
 		for(var i=0;i<len;i++){
 			var attr = attrs.item(i);
 			if (needNamespaceDefine(attr,isHTML, visibleNamespaces)) {
 				var prefix = attr.prefix||'';
 				var uri = attr.namespaceURI;
-				var ns = prefix ? ' xmlns:' + prefix : " xmlns";
-				buf.push(ns, '="' , uri , '"');
+				addSerializedAttribute(buf, prefix ? 'xmlns:' + prefix : "xmlns", uri);
 				visibleNamespaces.push({ prefix: prefix, namespace:uri });
 			}
 			serializeToString(attr,buf,isHTML,nodeFilter,visibleNamespaces);
 		}
+
 		// add namespace for current node		
-		if (needNamespaceDefine(node,isHTML, visibleNamespaces)) {
+		if (nodeName === prefixedNodeName && needNamespaceDefine(node, isHTML, visibleNamespaces)) {
 			var prefix = node.prefix||'';
 			var uri = node.namespaceURI;
-			var ns = prefix ? ' xmlns:' + prefix : " xmlns";
-			buf.push(ns, '="' , uri , '"');
+			addSerializedAttribute(buf, prefix ? 'xmlns:' + prefix : "xmlns", uri);
 			visibleNamespaces.push({ prefix: prefix, namespace:uri });
 		}
 		
@@ -1267,18 +3756,18 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 					if(child.data){
 						buf.push(child.data);
 					}else{
-						serializeToString(child,buf,isHTML,nodeFilter,visibleNamespaces);
+						serializeToString(child, buf, isHTML, nodeFilter, visibleNamespaces.slice());
 					}
 					child = child.nextSibling;
 				}
 			}else
 			{
 				while(child){
-					serializeToString(child,buf,isHTML,nodeFilter,visibleNamespaces);
+					serializeToString(child, buf, isHTML, nodeFilter, visibleNamespaces.slice());
 					child = child.nextSibling;
 				}
 			}
-			buf.push('</',nodeName,'>');
+			buf.push('</',prefixedNodeName,'>');
 		}else{
 			buf.push('/>');
 		}
@@ -1289,12 +3778,12 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 	case DOCUMENT_FRAGMENT_NODE:
 		var child = node.firstChild;
 		while(child){
-			serializeToString(child,buf,isHTML,nodeFilter,visibleNamespaces);
+			serializeToString(child, buf, isHTML, nodeFilter, visibleNamespaces.slice());
 			child = child.nextSibling;
 		}
 		return;
 	case ATTRIBUTE_NODE:
-		return buf.push(' ',node.name,'="',node.value.replace(/[&"]/g,_xmlEncoder),'"');
+		return addSerializedAttribute(buf, node.name, node.value);
 	case TEXT_NODE:
 		/**
 		 * The ampersand character (&) and the left angle bracket (<) must not appear in their literal form,
@@ -1446,10 +3935,12 @@ try{
 				return this.$$length;
 			}
 		});
+
 		Object.defineProperty(Node.prototype,'textContent',{
 			get:function(){
 				return getTextContent(this);
 			},
+
 			set:function(data){
 				switch(this.nodeType){
 				case ELEMENT_NODE:
@@ -1461,8 +3952,8 @@ try{
 						this.appendChild(this.ownerDocument.createTextNode(data));
 					}
 					break;
+
 				default:
-					//TODO:
 					this.data = data;
 					this.value = data;
 					this.nodeValue = data;
@@ -1487,6 +3978,7 @@ try{
 				return node.nodeValue;
 			}
 		}
+
 		__set__ = function(object,key,value){
 			//console.log(value)
 			object['$$'+key] = value
@@ -1496,950 +3988,14 @@ try{
 }
 
 //if(typeof require == 'function'){
-	exports.Node = Node;
+	exports.DocumentType = DocumentType;
 	exports.DOMException = DOMException;
 	exports.DOMImplementation = DOMImplementation;
+	exports.Element = Element;
+	exports.Node = Node;
+	exports.NodeList = NodeList;
 	exports.XMLSerializer = XMLSerializer;
 //}
-
-
-/***/ }),
-
-/***/ 470:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
-const command_1 = __webpack_require__(431);
-const file_command_1 = __webpack_require__(102);
-const utils_1 = __webpack_require__(82);
-const os = __importStar(__webpack_require__(87));
-const path = __importStar(__webpack_require__(622));
-/**
- * The code to exit an action
- */
-var ExitCode;
-(function (ExitCode) {
-    /**
-     * A code indicating that the action was successful
-     */
-    ExitCode[ExitCode["Success"] = 0] = "Success";
-    /**
-     * A code indicating that the action was a failure
-     */
-    ExitCode[ExitCode["Failure"] = 1] = "Failure";
-})(ExitCode = exports.ExitCode || (exports.ExitCode = {}));
-//-----------------------------------------------------------------------
-// Variables
-//-----------------------------------------------------------------------
-/**
- * Sets env variable for this action and future actions in the job
- * @param name the name of the variable to set
- * @param val the value of the variable. Non-string values will be converted to a string via JSON.stringify
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function exportVariable(name, val) {
-    const convertedVal = utils_1.toCommandValue(val);
-    process.env[name] = convertedVal;
-    const filePath = process.env['GITHUB_ENV'] || '';
-    if (filePath) {
-        const delimiter = '_GitHubActionsFileCommandDelimeter_';
-        const commandValue = `${name}<<${delimiter}${os.EOL}${convertedVal}${os.EOL}${delimiter}`;
-        file_command_1.issueCommand('ENV', commandValue);
-    }
-    else {
-        command_1.issueCommand('set-env', { name }, convertedVal);
-    }
-}
-exports.exportVariable = exportVariable;
-/**
- * Registers a secret which will get masked from logs
- * @param secret value of the secret
- */
-function setSecret(secret) {
-    command_1.issueCommand('add-mask', {}, secret);
-}
-exports.setSecret = setSecret;
-/**
- * Prepends inputPath to the PATH (for this action and future actions)
- * @param inputPath
- */
-function addPath(inputPath) {
-    const filePath = process.env['GITHUB_PATH'] || '';
-    if (filePath) {
-        file_command_1.issueCommand('PATH', inputPath);
-    }
-    else {
-        command_1.issueCommand('add-path', {}, inputPath);
-    }
-    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
-}
-exports.addPath = addPath;
-/**
- * Gets the value of an input.
- * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
- * Returns an empty string if the value is not defined.
- *
- * @param     name     name of the input to get
- * @param     options  optional. See InputOptions.
- * @returns   string
- */
-function getInput(name, options) {
-    const val = process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] || '';
-    if (options && options.required && !val) {
-        throw new Error(`Input required and not supplied: ${name}`);
-    }
-    if (options && options.trimWhitespace === false) {
-        return val;
-    }
-    return val.trim();
-}
-exports.getInput = getInput;
-/**
- * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
- * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
- * The return value is also in boolean type.
- * ref: https://yaml.org/spec/1.2/spec.html#id2804923
- *
- * @param     name     name of the input to get
- * @param     options  optional. See InputOptions.
- * @returns   boolean
- */
-function getBooleanInput(name, options) {
-    const trueValue = ['true', 'True', 'TRUE'];
-    const falseValue = ['false', 'False', 'FALSE'];
-    const val = getInput(name, options);
-    if (trueValue.includes(val))
-        return true;
-    if (falseValue.includes(val))
-        return false;
-    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
-        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
-}
-exports.getBooleanInput = getBooleanInput;
-/**
- * Sets the value of an output.
- *
- * @param     name     name of the output to set
- * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function setOutput(name, value) {
-    process.stdout.write(os.EOL);
-    command_1.issueCommand('set-output', { name }, value);
-}
-exports.setOutput = setOutput;
-/**
- * Enables or disables the echoing of commands into stdout for the rest of the step.
- * Echoing is disabled by default if ACTIONS_STEP_DEBUG is not set.
- *
- */
-function setCommandEcho(enabled) {
-    command_1.issue('echo', enabled ? 'on' : 'off');
-}
-exports.setCommandEcho = setCommandEcho;
-//-----------------------------------------------------------------------
-// Results
-//-----------------------------------------------------------------------
-/**
- * Sets the action status to failed.
- * When the action exits it will be with an exit code of 1
- * @param message add error issue message
- */
-function setFailed(message) {
-    process.exitCode = ExitCode.Failure;
-    error(message);
-}
-exports.setFailed = setFailed;
-//-----------------------------------------------------------------------
-// Logging Commands
-//-----------------------------------------------------------------------
-/**
- * Gets whether Actions Step Debug is on or not
- */
-function isDebug() {
-    return process.env['RUNNER_DEBUG'] === '1';
-}
-exports.isDebug = isDebug;
-/**
- * Writes debug message to user log
- * @param message debug message
- */
-function debug(message) {
-    command_1.issueCommand('debug', {}, message);
-}
-exports.debug = debug;
-/**
- * Adds an error issue
- * @param message error issue message. Errors will be converted to string via toString()
- */
-function error(message) {
-    command_1.issue('error', message instanceof Error ? message.toString() : message);
-}
-exports.error = error;
-/**
- * Adds an warning issue
- * @param message warning issue message. Errors will be converted to string via toString()
- */
-function warning(message) {
-    command_1.issue('warning', message instanceof Error ? message.toString() : message);
-}
-exports.warning = warning;
-/**
- * Writes info to log with console.log.
- * @param message info message
- */
-function info(message) {
-    process.stdout.write(message + os.EOL);
-}
-exports.info = info;
-/**
- * Begin an output group.
- *
- * Output until the next `groupEnd` will be foldable in this group
- *
- * @param name The name of the output group
- */
-function startGroup(name) {
-    command_1.issue('group', name);
-}
-exports.startGroup = startGroup;
-/**
- * End an output group.
- */
-function endGroup() {
-    command_1.issue('endgroup');
-}
-exports.endGroup = endGroup;
-/**
- * Wrap an asynchronous function call in a group.
- *
- * Returns the same type as the function itself.
- *
- * @param name The name of the group
- * @param fn The function to wrap in the group
- */
-function group(name, fn) {
-    return __awaiter(this, void 0, void 0, function* () {
-        startGroup(name);
-        let result;
-        try {
-            result = yield fn();
-        }
-        finally {
-            endGroup();
-        }
-        return result;
-    });
-}
-exports.group = group;
-//-----------------------------------------------------------------------
-// Wrapper action state
-//-----------------------------------------------------------------------
-/**
- * Saves state for current action, the state can only be retrieved by this action's post job execution.
- *
- * @param     name     name of the state to store
- * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function saveState(name, value) {
-    command_1.issueCommand('save-state', { name }, value);
-}
-exports.saveState = saveState;
-/**
- * Gets the value of an state set by this action's main execution.
- *
- * @param     name     name of the state to get
- * @returns   string
- */
-function getState(name) {
-    return process.env[`STATE_${name}`] || '';
-}
-exports.getState = getState;
-//# sourceMappingURL=core.js.map
-
-/***/ }),
-
-/***/ 503:
-/***/ (function(__unusedmodule, exports) {
-
-//[4]   	NameStartChar	   ::=   	":" | [A-Z] | "_" | [a-z] | [#xC0-#xD6] | [#xD8-#xF6] | [#xF8-#x2FF] | [#x370-#x37D] | [#x37F-#x1FFF] | [#x200C-#x200D] | [#x2070-#x218F] | [#x2C00-#x2FEF] | [#x3001-#xD7FF] | [#xF900-#xFDCF] | [#xFDF0-#xFFFD] | [#x10000-#xEFFFF]
-//[4a]   	NameChar	   ::=   	NameStartChar | "-" | "." | [0-9] | #xB7 | [#x0300-#x036F] | [#x203F-#x2040]
-//[5]   	Name	   ::=   	NameStartChar (NameChar)*
-var nameStartChar = /[A-Z_a-z\xC0-\xD6\xD8-\xF6\u00F8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD]///\u10000-\uEFFFF
-var nameChar = new RegExp("[\\-\\.0-9"+nameStartChar.source.slice(1,-1)+"\\u00B7\\u0300-\\u036F\\u203F-\\u2040]");
-var tagNamePattern = new RegExp('^'+nameStartChar.source+nameChar.source+'*(?:\:'+nameStartChar.source+nameChar.source+'*)?$');
-//var tagNamePattern = /^[a-zA-Z_][\w\-\.]*(?:\:[a-zA-Z_][\w\-\.]*)?$/
-//var handlers = 'resolveEntity,getExternalSubset,characters,endDocument,endElement,endPrefixMapping,ignorableWhitespace,processingInstruction,setDocumentLocator,skippedEntity,startDocument,startElement,startPrefixMapping,notationDecl,unparsedEntityDecl,error,fatalError,warning,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,comment,endCDATA,endDTD,endEntity,startCDATA,startDTD,startEntity'.split(',')
-
-//S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
-//S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
-var S_TAG = 0;//tag name offerring
-var S_ATTR = 1;//attr name offerring 
-var S_ATTR_SPACE=2;//attr name end and space offer
-var S_EQ = 3;//=space?
-var S_ATTR_NOQUOT_VALUE = 4;//attr value(no quot value only)
-var S_ATTR_END = 5;//attr value end and no space(quot end)
-var S_TAG_SPACE = 6;//(attr value end || tag end ) && (space offer)
-var S_TAG_CLOSE = 7;//closed el<el />
-
-/**
- * Creates an error that will not be caught by XMLReader aka the SAX parser.
- *
- * @param {string} message
- * @param {any?} locator Optional, can provide details about the location in the source
- * @constructor
- */
-function ParseError(message, locator) {
-	this.message = message
-	this.locator = locator
-	if(Error.captureStackTrace) Error.captureStackTrace(this, ParseError);
-}
-ParseError.prototype = new Error();
-ParseError.prototype.name = ParseError.name
-
-function XMLReader(){
-	
-}
-
-XMLReader.prototype = {
-	parse:function(source,defaultNSMap,entityMap){
-		var domBuilder = this.domBuilder;
-		domBuilder.startDocument();
-		_copy(defaultNSMap ,defaultNSMap = {})
-		parse(source,defaultNSMap,entityMap,
-				domBuilder,this.errorHandler);
-		domBuilder.endDocument();
-	}
-}
-function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
-	function fixedFromCharCode(code) {
-		// String.prototype.fromCharCode does not supports
-		// > 2 bytes unicode chars directly
-		if (code > 0xffff) {
-			code -= 0x10000;
-			var surrogate1 = 0xd800 + (code >> 10)
-				, surrogate2 = 0xdc00 + (code & 0x3ff);
-
-			return String.fromCharCode(surrogate1, surrogate2);
-		} else {
-			return String.fromCharCode(code);
-		}
-	}
-	function entityReplacer(a){
-		var k = a.slice(1,-1);
-		if(k in entityMap){
-			return entityMap[k]; 
-		}else if(k.charAt(0) === '#'){
-			return fixedFromCharCode(parseInt(k.substr(1).replace('x','0x')))
-		}else{
-			errorHandler.error('entity not found:'+a);
-			return a;
-		}
-	}
-	function appendText(end){//has some bugs
-		if(end>start){
-			var xt = source.substring(start,end).replace(/&#?\w+;/g,entityReplacer);
-			locator&&position(start);
-			domBuilder.characters(xt,0,end-start);
-			start = end
-		}
-	}
-	function position(p,m){
-		while(p>=lineEnd && (m = linePattern.exec(source))){
-			lineStart = m.index;
-			lineEnd = lineStart + m[0].length;
-			locator.lineNumber++;
-			//console.log('line++:',locator,startPos,endPos)
-		}
-		locator.columnNumber = p-lineStart+1;
-	}
-	var lineStart = 0;
-	var lineEnd = 0;
-	var linePattern = /.*(?:\r\n?|\n)|.*$/g
-	var locator = domBuilder.locator;
-	
-	var parseStack = [{currentNSMap:defaultNSMapCopy}]
-	var closeMap = {};
-	var start = 0;
-	while(true){
-		try{
-			var tagStart = source.indexOf('<',start);
-			if(tagStart<0){
-				if(!source.substr(start).match(/^\s*$/)){
-					var doc = domBuilder.doc;
-	    			var text = doc.createTextNode(source.substr(start));
-	    			doc.appendChild(text);
-	    			domBuilder.currentElement = text;
-				}
-				return;
-			}
-			if(tagStart>start){
-				appendText(tagStart);
-			}
-			switch(source.charAt(tagStart+1)){
-			case '/':
-				var end = source.indexOf('>',tagStart+3);
-				var tagName = source.substring(tagStart+2,end);
-				var config = parseStack.pop();
-				if(end<0){
-					
-	        		tagName = source.substring(tagStart+2).replace(/[\s<].*/,'');
-	        		//console.error('#@@@@@@'+tagName)
-	        		errorHandler.error("end tag name: "+tagName+' is not complete:'+config.tagName);
-	        		end = tagStart+1+tagName.length;
-	        	}else if(tagName.match(/\s</)){
-	        		tagName = tagName.replace(/[\s<].*/,'');
-	        		errorHandler.error("end tag name: "+tagName+' maybe not complete');
-	        		end = tagStart+1+tagName.length;
-				}
-				//console.error(parseStack.length,parseStack)
-				//console.error(config);
-				var localNSMap = config.localNSMap;
-				var endMatch = config.tagName == tagName;
-				var endIgnoreCaseMach = endMatch || config.tagName&&config.tagName.toLowerCase() == tagName.toLowerCase()
-		        if(endIgnoreCaseMach){
-		        	domBuilder.endElement(config.uri,config.localName,tagName);
-					if(localNSMap){
-						for(var prefix in localNSMap){
-							domBuilder.endPrefixMapping(prefix) ;
-						}
-					}
-					if(!endMatch){
-		            	errorHandler.fatalError("end tag name: "+tagName+' is not match the current start tagName:'+config.tagName ); // No known test case
-					}
-		        }else{
-		        	parseStack.push(config)
-		        }
-				
-				end++;
-				break;
-				// end elment
-			case '?':// <?...?>
-				locator&&position(tagStart);
-				end = parseInstruction(source,tagStart,domBuilder);
-				break;
-			case '!':// <!doctype,<![CDATA,<!--
-				locator&&position(tagStart);
-				end = parseDCC(source,tagStart,domBuilder,errorHandler);
-				break;
-			default:
-				locator&&position(tagStart);
-				var el = new ElementAttributes();
-				var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
-				//elStartEnd
-				var end = parseElementStartPart(source,tagStart,el,currentNSMap,entityReplacer,errorHandler);
-				var len = el.length;
-				
-				
-				if(!el.closed && fixSelfClosed(source,end,el.tagName,closeMap)){
-					el.closed = true;
-					if(!entityMap.nbsp){
-						errorHandler.warning('unclosed xml attribute');
-					}
-				}
-				if(locator && len){
-					var locator2 = copyLocator(locator,{});
-					//try{//attribute position fixed
-					for(var i = 0;i<len;i++){
-						var a = el[i];
-						position(a.offset);
-						a.locator = copyLocator(locator,{});
-					}
-					//}catch(e){console.error('@@@@@'+e)}
-					domBuilder.locator = locator2
-					if(appendElement(el,domBuilder,currentNSMap)){
-						parseStack.push(el)
-					}
-					domBuilder.locator = locator;
-				}else{
-					if(appendElement(el,domBuilder,currentNSMap)){
-						parseStack.push(el)
-					}
-				}
-				
-				
-				
-				if(el.uri === 'http://www.w3.org/1999/xhtml' && !el.closed){
-					end = parseHtmlSpecialContent(source,end,el.tagName,entityReplacer,domBuilder)
-				}else{
-					end++;
-				}
-			}
-		}catch(e){
-			if (e instanceof ParseError) {
-				throw e;
-			}
-			errorHandler.error('element parse error: '+e)
-			end = -1;
-		}
-		if(end>start){
-			start = end;
-		}else{
-			//TODO: 这里有可能sax回退，有位置错误风险
-			appendText(Math.max(tagStart,start)+1);
-		}
-	}
-}
-function copyLocator(f,t){
-	t.lineNumber = f.lineNumber;
-	t.columnNumber = f.columnNumber;
-	return t;
-}
-
-/**
- * @see #appendElement(source,elStartEnd,el,selfClosed,entityReplacer,domBuilder,parseStack);
- * @return end of the elementStartPart(end of elementEndPart for selfClosed el)
- */
-function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,errorHandler){
-
-	/**
-	 * @param {string} qname
-	 * @param {string} value
-	 * @param {number} startIndex
-	 */
-	function addAttribute(qname, value, startIndex) {
-		if (qname in el.attributeNames) errorHandler.fatalError('Attribute ' + qname + ' redefined')
-		el.addValue(qname, value, startIndex)
-	}
-	var attrName;
-	var value;
-	var p = ++start;
-	var s = S_TAG;//status
-	while(true){
-		var c = source.charAt(p);
-		switch(c){
-		case '=':
-			if(s === S_ATTR){//attrName
-				attrName = source.slice(start,p);
-				s = S_EQ;
-			}else if(s === S_ATTR_SPACE){
-				s = S_EQ;
-			}else{
-				//fatalError: equal must after attrName or space after attrName
-				throw new Error('attribute equal must after attrName'); // No known test case
-			}
-			break;
-		case '\'':
-		case '"':
-			if(s === S_EQ || s === S_ATTR //|| s == S_ATTR_SPACE
-				){//equal
-				if(s === S_ATTR){
-					errorHandler.warning('attribute value must after "="')
-					attrName = source.slice(start,p)
-				}
-				start = p+1;
-				p = source.indexOf(c,start)
-				if(p>0){
-					value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
-					addAttribute(attrName, value, start-1);
-					s = S_ATTR_END;
-				}else{
-					//fatalError: no end quot match
-					throw new Error('attribute value no end \''+c+'\' match');
-				}
-			}else if(s == S_ATTR_NOQUOT_VALUE){
-				value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
-				//console.log(attrName,value,start,p)
-				addAttribute(attrName, value, start);
-				//console.dir(el)
-				errorHandler.warning('attribute "'+attrName+'" missed start quot('+c+')!!');
-				start = p+1;
-				s = S_ATTR_END
-			}else{
-				//fatalError: no equal before
-				throw new Error('attribute value must after "="'); // No known test case
-			}
-			break;
-		case '/':
-			switch(s){
-			case S_TAG:
-				el.setTagName(source.slice(start,p));
-			case S_ATTR_END:
-			case S_TAG_SPACE:
-			case S_TAG_CLOSE:
-				s =S_TAG_CLOSE;
-				el.closed = true;
-			case S_ATTR_NOQUOT_VALUE:
-			case S_ATTR:
-			case S_ATTR_SPACE:
-				break;
-			//case S_EQ:
-			default:
-				throw new Error("attribute invalid close char('/')") // No known test case
-			}
-			break;
-		case ''://end document
-			errorHandler.error('unexpected end of input');
-			if(s == S_TAG){
-				el.setTagName(source.slice(start,p));
-			}
-			return p;
-		case '>':
-			switch(s){
-			case S_TAG:
-				el.setTagName(source.slice(start,p));
-			case S_ATTR_END:
-			case S_TAG_SPACE:
-			case S_TAG_CLOSE:
-				break;//normal
-			case S_ATTR_NOQUOT_VALUE://Compatible state
-			case S_ATTR:
-				value = source.slice(start,p);
-				if(value.slice(-1) === '/'){
-					el.closed  = true;
-					value = value.slice(0,-1)
-				}
-			case S_ATTR_SPACE:
-				if(s === S_ATTR_SPACE){
-					value = attrName;
-				}
-				if(s == S_ATTR_NOQUOT_VALUE){
-					errorHandler.warning('attribute "'+value+'" missed quot(")!');
-					addAttribute(attrName, value.replace(/&#?\w+;/g,entityReplacer), start)
-				}else{
-					if(currentNSMap[''] !== 'http://www.w3.org/1999/xhtml' || !value.match(/^(?:disabled|checked|selected)$/i)){
-						errorHandler.warning('attribute "'+value+'" missed value!! "'+value+'" instead!!')
-					}
-					addAttribute(value, value, start)
-				}
-				break;
-			case S_EQ:
-				throw new Error('attribute value missed!!');
-			}
-//			console.log(tagName,tagNamePattern,tagNamePattern.test(tagName))
-			return p;
-		/*xml space '\x20' | #x9 | #xD | #xA; */
-		case '\u0080':
-			c = ' ';
-		default:
-			if(c<= ' '){//space
-				switch(s){
-				case S_TAG:
-					el.setTagName(source.slice(start,p));//tagName
-					s = S_TAG_SPACE;
-					break;
-				case S_ATTR:
-					attrName = source.slice(start,p)
-					s = S_ATTR_SPACE;
-					break;
-				case S_ATTR_NOQUOT_VALUE:
-					var value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
-					errorHandler.warning('attribute "'+value+'" missed quot(")!!');
-					addAttribute(attrName, value, start)
-				case S_ATTR_END:
-					s = S_TAG_SPACE;
-					break;
-				//case S_TAG_SPACE:
-				//case S_EQ:
-				//case S_ATTR_SPACE:
-				//	void();break;
-				//case S_TAG_CLOSE:
-					//ignore warning
-				}
-			}else{//not space
-//S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
-//S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
-				switch(s){
-				//case S_TAG:void();break;
-				//case S_ATTR:void();break;
-				//case S_ATTR_NOQUOT_VALUE:void();break;
-				case S_ATTR_SPACE:
-					var tagName =  el.tagName;
-					if(currentNSMap[''] !== 'http://www.w3.org/1999/xhtml' || !attrName.match(/^(?:disabled|checked|selected)$/i)){
-						errorHandler.warning('attribute "'+attrName+'" missed value!! "'+attrName+'" instead2!!')
-					}
-					addAttribute(attrName, attrName, start);
-					start = p;
-					s = S_ATTR;
-					break;
-				case S_ATTR_END:
-					errorHandler.warning('attribute space is required"'+attrName+'"!!')
-				case S_TAG_SPACE:
-					s = S_ATTR;
-					start = p;
-					break;
-				case S_EQ:
-					s = S_ATTR_NOQUOT_VALUE;
-					start = p;
-					break;
-				case S_TAG_CLOSE:
-					throw new Error("elements closed character '/' and '>' must be connected to");
-				}
-			}
-		}//end outer switch
-		//console.log('p++',p)
-		p++;
-	}
-}
-/**
- * @return true if has new namespace define
- */
-function appendElement(el,domBuilder,currentNSMap){
-	var tagName = el.tagName;
-	var localNSMap = null;
-	//var currentNSMap = parseStack[parseStack.length-1].currentNSMap;
-	var i = el.length;
-	while(i--){
-		var a = el[i];
-		var qName = a.qName;
-		var value = a.value;
-		var nsp = qName.indexOf(':');
-		if(nsp>0){
-			var prefix = a.prefix = qName.slice(0,nsp);
-			var localName = qName.slice(nsp+1);
-			var nsPrefix = prefix === 'xmlns' && localName
-		}else{
-			localName = qName;
-			prefix = null
-			nsPrefix = qName === 'xmlns' && ''
-		}
-		//can not set prefix,because prefix !== ''
-		a.localName = localName ;
-		//prefix == null for no ns prefix attribute 
-		if(nsPrefix !== false){//hack!!
-			if(localNSMap == null){
-				localNSMap = {}
-				//console.log(currentNSMap,0)
-				_copy(currentNSMap,currentNSMap={})
-				//console.log(currentNSMap,1)
-			}
-			currentNSMap[nsPrefix] = localNSMap[nsPrefix] = value;
-			a.uri = 'http://www.w3.org/2000/xmlns/'
-			domBuilder.startPrefixMapping(nsPrefix, value) 
-		}
-	}
-	var i = el.length;
-	while(i--){
-		a = el[i];
-		var prefix = a.prefix;
-		if(prefix){//no prefix attribute has no namespace
-			if(prefix === 'xml'){
-				a.uri = 'http://www.w3.org/XML/1998/namespace';
-			}if(prefix !== 'xmlns'){
-				a.uri = currentNSMap[prefix || '']
-				
-				//{console.log('###'+a.qName,domBuilder.locator.systemId+'',currentNSMap,a.uri)}
-			}
-		}
-	}
-	var nsp = tagName.indexOf(':');
-	if(nsp>0){
-		prefix = el.prefix = tagName.slice(0,nsp);
-		localName = el.localName = tagName.slice(nsp+1);
-	}else{
-		prefix = null;//important!!
-		localName = el.localName = tagName;
-	}
-	//no prefix element has default namespace
-	var ns = el.uri = currentNSMap[prefix || ''];
-	domBuilder.startElement(ns,localName,tagName,el);
-	//endPrefixMapping and startPrefixMapping have not any help for dom builder
-	//localNSMap = null
-	if(el.closed){
-		domBuilder.endElement(ns,localName,tagName);
-		if(localNSMap){
-			for(prefix in localNSMap){
-				domBuilder.endPrefixMapping(prefix) 
-			}
-		}
-	}else{
-		el.currentNSMap = currentNSMap;
-		el.localNSMap = localNSMap;
-		//parseStack.push(el);
-		return true;
-	}
-}
-function parseHtmlSpecialContent(source,elStartEnd,tagName,entityReplacer,domBuilder){
-	if(/^(?:script|textarea)$/i.test(tagName)){
-		var elEndStart =  source.indexOf('</'+tagName+'>',elStartEnd);
-		var text = source.substring(elStartEnd+1,elEndStart);
-		if(/[&<]/.test(text)){
-			if(/^script$/i.test(tagName)){
-				//if(!/\]\]>/.test(text)){
-					//lexHandler.startCDATA();
-					domBuilder.characters(text,0,text.length);
-					//lexHandler.endCDATA();
-					return elEndStart;
-				//}
-			}//}else{//text area
-				text = text.replace(/&#?\w+;/g,entityReplacer);
-				domBuilder.characters(text,0,text.length);
-				return elEndStart;
-			//}
-			
-		}
-	}
-	return elStartEnd+1;
-}
-function fixSelfClosed(source,elStartEnd,tagName,closeMap){
-	//if(tagName in closeMap){
-	var pos = closeMap[tagName];
-	if(pos == null){
-		//console.log(tagName)
-		pos =  source.lastIndexOf('</'+tagName+'>')
-		if(pos<elStartEnd){//忘记闭合
-			pos = source.lastIndexOf('</'+tagName)
-		}
-		closeMap[tagName] =pos
-	}
-	return pos<elStartEnd;
-	//} 
-}
-function _copy(source,target){
-	for(var n in source){target[n] = source[n]}
-}
-function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
-	var next= source.charAt(start+2)
-	switch(next){
-	case '-':
-		if(source.charAt(start + 3) === '-'){
-			var end = source.indexOf('-->',start+4);
-			//append comment source.substring(4,end)//<!--
-			if(end>start){
-				domBuilder.comment(source,start+4,end-start-4);
-				return end+3;
-			}else{
-				errorHandler.error("Unclosed comment");
-				return -1;
-			}
-		}else{
-			//error
-			return -1;
-		}
-	default:
-		if(source.substr(start+3,6) == 'CDATA['){
-			var end = source.indexOf(']]>',start+9);
-			domBuilder.startCDATA();
-			domBuilder.characters(source,start+9,end-start-9);
-			domBuilder.endCDATA() 
-			return end+3;
-		}
-		//<!DOCTYPE
-		//startDTD(java.lang.String name, java.lang.String publicId, java.lang.String systemId) 
-		var matchs = split(source,start);
-		var len = matchs.length;
-		if(len>1 && /!doctype/i.test(matchs[0][0])){
-			var name = matchs[1][0];
-			var pubid = false;
-			var sysid = false;
-			if(len>3){
-				if(/^public$/i.test(matchs[2][0])){
-					pubid = matchs[3][0];
-					sysid = len>4 && matchs[4][0];
-				}else if(/^system$/i.test(matchs[2][0])){
-					sysid = matchs[3][0];
-				}
-			}
-			var lastMatch = matchs[len-1]
-			domBuilder.startDTD(name, pubid, sysid);
-			domBuilder.endDTD();
-			
-			return lastMatch.index+lastMatch[0].length
-		}
-	}
-	return -1;
-}
-
-
-
-function parseInstruction(source,start,domBuilder){
-	var end = source.indexOf('?>',start);
-	if(end){
-		var match = source.substring(start,end).match(/^<\?(\S*)\s*([\s\S]*?)\s*$/);
-		if(match){
-			var len = match[0].length;
-			domBuilder.processingInstruction(match[1], match[2]) ;
-			return end+2;
-		}else{//error
-			return -1;
-		}
-	}
-	return -1;
-}
-
-function ElementAttributes(){
-	this.attributeNames = {}
-}
-ElementAttributes.prototype = {
-	setTagName:function(tagName){
-		if(!tagNamePattern.test(tagName)){
-			throw new Error('invalid tagName:'+tagName)
-		}
-		this.tagName = tagName
-	},
-	addValue:function(qName, value, offset) {
-		if(!tagNamePattern.test(qName)){
-			throw new Error('invalid attribute:'+qName)
-		}
-		this.attributeNames[qName] = this.length;
-		this[this.length++] = {qName:qName,value:value,offset:offset}
-	},
-	length:0,
-	getLocalName:function(i){return this[i].localName},
-	getLocator:function(i){return this[i].locator},
-	getQName:function(i){return this[i].qName},
-	getURI:function(i){return this[i].uri},
-	getValue:function(i){return this[i].value}
-//	,getIndex:function(uri, localName)){
-//		if(localName){
-//			
-//		}else{
-//			var qName = uri
-//		}
-//	},
-//	getValue:function(){return this.getValue(this.getIndex.apply(this,arguments))},
-//	getType:function(uri,localName){}
-//	getType:function(i){},
-}
-
-
-
-function split(source,start){
-	var match;
-	var buf = [];
-	var reg = /'[^']+'|"[^"]+"|[^\s<>\/=]+=?|(\/?\s*>|<)/g;
-	reg.lastIndex = start;
-	reg.exec(source);//skip <
-	while(match = reg.exec(source)){
-		buf.push(match);
-		if(match[1])return buf;
-	}
-}
-
-exports.XMLReader = XMLReader;
-exports.ParseError = ParseError;
 
 
 /***/ }),
@@ -2648,7 +4204,7 @@ function parse(xml, options = {}) {
     }
 
     function attribute() {
-        const m = match(/([\w:-]+)\s*=\s*("[^"]*"|'[^']*'|\w+)\s*/);
+        const m = match(/([\w-:.]+)\s*=\s*("[^"]*"|'[^']*'|\w+)\s*/);
         if (!m) return;
         return {name: m[1], value: strip(m[2])}
     }
@@ -2694,10 +4250,492 @@ module.exports = parse;
 
 /***/ }),
 
+/***/ 518:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+var dom = __webpack_require__(476)
+exports.DOMImplementation = dom.DOMImplementation
+exports.XMLSerializer = dom.XMLSerializer
+exports.DOMParser = __webpack_require__(731).DOMParser
+
+
+/***/ }),
+
+/***/ 554:
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PersonalAccessTokenCredentialHandler = exports.BearerCredentialHandler = exports.BasicCredentialHandler = void 0;
+class BasicCredentialHandler {
+    constructor(username, password) {
+        this.username = username;
+        this.password = password;
+    }
+    prepareRequest(options) {
+        if (!options.headers) {
+            throw Error('The request has no headers');
+        }
+        options.headers['Authorization'] = `Basic ${Buffer.from(`${this.username}:${this.password}`).toString('base64')}`;
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication() {
+        return false;
+    }
+    handleAuthentication() {
+        return __awaiter(this, void 0, void 0, function* () {
+            throw new Error('not implemented');
+        });
+    }
+}
+exports.BasicCredentialHandler = BasicCredentialHandler;
+class BearerCredentialHandler {
+    constructor(token) {
+        this.token = token;
+    }
+    // currently implements pre-authorization
+    // TODO: support preAuth = false where it hooks on 401
+    prepareRequest(options) {
+        if (!options.headers) {
+            throw Error('The request has no headers');
+        }
+        options.headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication() {
+        return false;
+    }
+    handleAuthentication() {
+        return __awaiter(this, void 0, void 0, function* () {
+            throw new Error('not implemented');
+        });
+    }
+}
+exports.BearerCredentialHandler = BearerCredentialHandler;
+class PersonalAccessTokenCredentialHandler {
+    constructor(token) {
+        this.token = token;
+    }
+    // currently implements pre-authorization
+    // TODO: support preAuth = false where it hooks on 401
+    prepareRequest(options) {
+        if (!options.headers) {
+            throw Error('The request has no headers');
+        }
+        options.headers['Authorization'] = `Basic ${Buffer.from(`PAT:${this.token}`).toString('base64')}`;
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication() {
+        return false;
+    }
+    handleAuthentication() {
+        return __awaiter(this, void 0, void 0, function* () {
+            throw new Error('not implemented');
+        });
+    }
+}
+exports.PersonalAccessTokenCredentialHandler = PersonalAccessTokenCredentialHandler;
+//# sourceMappingURL=auth.js.map
+
+/***/ }),
+
+/***/ 573:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.toPlatformPath = exports.toWin32Path = exports.toPosixPath = void 0;
+const path = __importStar(__webpack_require__(622));
+/**
+ * toPosixPath converts the given path to the posix form. On Windows, \\ will be
+ * replaced with /.
+ *
+ * @param pth. Path to transform.
+ * @return string Posix path.
+ */
+function toPosixPath(pth) {
+    return pth.replace(/[\\]/g, '/');
+}
+exports.toPosixPath = toPosixPath;
+/**
+ * toWin32Path converts the given path to the win32 form. On Linux, / will be
+ * replaced with \\.
+ *
+ * @param pth. Path to transform.
+ * @return string Win32 path.
+ */
+function toWin32Path(pth) {
+    return pth.replace(/[/]/g, '\\');
+}
+exports.toWin32Path = toWin32Path;
+/**
+ * toPlatformPath converts the given path to a platform-specific path. It does
+ * this by replacing instances of / and \ with the platform-specific path
+ * separator.
+ *
+ * @param pth The path to platformize.
+ * @return string The platform-specific path.
+ */
+function toPlatformPath(pth) {
+    return pth.replace(/[/\\]/g, path.sep);
+}
+exports.toPlatformPath = toPlatformPath;
+//# sourceMappingURL=path-utils.js.map
+
+/***/ }),
+
+/***/ 605:
+/***/ (function(module) {
+
+module.exports = require("http");
+
+/***/ }),
+
+/***/ 614:
+/***/ (function(module) {
+
+module.exports = require("events");
+
+/***/ }),
+
 /***/ 622:
 /***/ (function(module) {
 
 module.exports = require("path");
+
+/***/ }),
+
+/***/ 631:
+/***/ (function(module) {
+
+module.exports = require("net");
+
+/***/ }),
+
+/***/ 665:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.summary = exports.markdownSummary = exports.SUMMARY_DOCS_URL = exports.SUMMARY_ENV_VAR = void 0;
+const os_1 = __webpack_require__(87);
+const fs_1 = __webpack_require__(747);
+const { access, appendFile, writeFile } = fs_1.promises;
+exports.SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
+exports.SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary';
+class Summary {
+    constructor() {
+        this._buffer = '';
+    }
+    /**
+     * Finds the summary file path from the environment, rejects if env var is not found or file does not exist
+     * Also checks r/w permissions.
+     *
+     * @returns step summary file path
+     */
+    filePath() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this._filePath) {
+                return this._filePath;
+            }
+            const pathFromEnv = process.env[exports.SUMMARY_ENV_VAR];
+            if (!pathFromEnv) {
+                throw new Error(`Unable to find environment variable for $${exports.SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
+            }
+            try {
+                yield access(pathFromEnv, fs_1.constants.R_OK | fs_1.constants.W_OK);
+            }
+            catch (_a) {
+                throw new Error(`Unable to access summary file: '${pathFromEnv}'. Check if the file has correct read/write permissions.`);
+            }
+            this._filePath = pathFromEnv;
+            return this._filePath;
+        });
+    }
+    /**
+     * Wraps content in an HTML tag, adding any HTML attributes
+     *
+     * @param {string} tag HTML tag to wrap
+     * @param {string | null} content content within the tag
+     * @param {[attribute: string]: string} attrs key-value list of HTML attributes to add
+     *
+     * @returns {string} content wrapped in HTML element
+     */
+    wrap(tag, content, attrs = {}) {
+        const htmlAttrs = Object.entries(attrs)
+            .map(([key, value]) => ` ${key}="${value}"`)
+            .join('');
+        if (!content) {
+            return `<${tag}${htmlAttrs}>`;
+        }
+        return `<${tag}${htmlAttrs}>${content}</${tag}>`;
+    }
+    /**
+     * Writes text in the buffer to the summary buffer file and empties buffer. Will append by default.
+     *
+     * @param {SummaryWriteOptions} [options] (optional) options for write operation
+     *
+     * @returns {Promise<Summary>} summary instance
+     */
+    write(options) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const overwrite = !!(options === null || options === void 0 ? void 0 : options.overwrite);
+            const filePath = yield this.filePath();
+            const writeFunc = overwrite ? writeFile : appendFile;
+            yield writeFunc(filePath, this._buffer, { encoding: 'utf8' });
+            return this.emptyBuffer();
+        });
+    }
+    /**
+     * Clears the summary buffer and wipes the summary file
+     *
+     * @returns {Summary} summary instance
+     */
+    clear() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.emptyBuffer().write({ overwrite: true });
+        });
+    }
+    /**
+     * Returns the current summary buffer as a string
+     *
+     * @returns {string} string of summary buffer
+     */
+    stringify() {
+        return this._buffer;
+    }
+    /**
+     * If the summary buffer is empty
+     *
+     * @returns {boolen} true if the buffer is empty
+     */
+    isEmptyBuffer() {
+        return this._buffer.length === 0;
+    }
+    /**
+     * Resets the summary buffer without writing to summary file
+     *
+     * @returns {Summary} summary instance
+     */
+    emptyBuffer() {
+        this._buffer = '';
+        return this;
+    }
+    /**
+     * Adds raw text to the summary buffer
+     *
+     * @param {string} text content to add
+     * @param {boolean} [addEOL=false] (optional) append an EOL to the raw text (default: false)
+     *
+     * @returns {Summary} summary instance
+     */
+    addRaw(text, addEOL = false) {
+        this._buffer += text;
+        return addEOL ? this.addEOL() : this;
+    }
+    /**
+     * Adds the operating system-specific end-of-line marker to the buffer
+     *
+     * @returns {Summary} summary instance
+     */
+    addEOL() {
+        return this.addRaw(os_1.EOL);
+    }
+    /**
+     * Adds an HTML codeblock to the summary buffer
+     *
+     * @param {string} code content to render within fenced code block
+     * @param {string} lang (optional) language to syntax highlight code
+     *
+     * @returns {Summary} summary instance
+     */
+    addCodeBlock(code, lang) {
+        const attrs = Object.assign({}, (lang && { lang }));
+        const element = this.wrap('pre', this.wrap('code', code), attrs);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML list to the summary buffer
+     *
+     * @param {string[]} items list of items to render
+     * @param {boolean} [ordered=false] (optional) if the rendered list should be ordered or not (default: false)
+     *
+     * @returns {Summary} summary instance
+     */
+    addList(items, ordered = false) {
+        const tag = ordered ? 'ol' : 'ul';
+        const listItems = items.map(item => this.wrap('li', item)).join('');
+        const element = this.wrap(tag, listItems);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML table to the summary buffer
+     *
+     * @param {SummaryTableCell[]} rows table rows
+     *
+     * @returns {Summary} summary instance
+     */
+    addTable(rows) {
+        const tableBody = rows
+            .map(row => {
+            const cells = row
+                .map(cell => {
+                if (typeof cell === 'string') {
+                    return this.wrap('td', cell);
+                }
+                const { header, data, colspan, rowspan } = cell;
+                const tag = header ? 'th' : 'td';
+                const attrs = Object.assign(Object.assign({}, (colspan && { colspan })), (rowspan && { rowspan }));
+                return this.wrap(tag, data, attrs);
+            })
+                .join('');
+            return this.wrap('tr', cells);
+        })
+            .join('');
+        const element = this.wrap('table', tableBody);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds a collapsable HTML details element to the summary buffer
+     *
+     * @param {string} label text for the closed state
+     * @param {string} content collapsable content
+     *
+     * @returns {Summary} summary instance
+     */
+    addDetails(label, content) {
+        const element = this.wrap('details', this.wrap('summary', label) + content);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML image tag to the summary buffer
+     *
+     * @param {string} src path to the image you to embed
+     * @param {string} alt text description of the image
+     * @param {SummaryImageOptions} options (optional) addition image attributes
+     *
+     * @returns {Summary} summary instance
+     */
+    addImage(src, alt, options) {
+        const { width, height } = options || {};
+        const attrs = Object.assign(Object.assign({}, (width && { width })), (height && { height }));
+        const element = this.wrap('img', null, Object.assign({ src, alt }, attrs));
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML section heading element
+     *
+     * @param {string} text heading text
+     * @param {number | string} [level=1] (optional) the heading level, default: 1
+     *
+     * @returns {Summary} summary instance
+     */
+    addHeading(text, level) {
+        const tag = `h${level}`;
+        const allowedTag = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)
+            ? tag
+            : 'h1';
+        const element = this.wrap(allowedTag, text);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML thematic break (<hr>) to the summary buffer
+     *
+     * @returns {Summary} summary instance
+     */
+    addSeparator() {
+        const element = this.wrap('hr', null);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML line break (<br>) to the summary buffer
+     *
+     * @returns {Summary} summary instance
+     */
+    addBreak() {
+        const element = this.wrap('br', null);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML blockquote to the summary buffer
+     *
+     * @param {string} text quote text
+     * @param {string} cite (optional) citation url
+     *
+     * @returns {Summary} summary instance
+     */
+    addQuote(text, cite) {
+        const attrs = Object.assign({}, (cite && { cite }));
+        const element = this.wrap('blockquote', text, attrs);
+        return this.addRaw(element).addEOL();
+    }
+    /**
+     * Adds an HTML anchor tag to the summary buffer
+     *
+     * @param {string} text link text/content
+     * @param {string} href hyperlink
+     *
+     * @returns {Summary} summary instance
+     */
+    addLink(text, href) {
+        const element = this.wrap('a', text, { href });
+        return this.addRaw(element).addEOL();
+    }
+}
+const _summary = new Summary();
+/**
+ * @deprecated use `core.summary`
+ */
+exports.markdownSummary = _summary;
+exports.summary = _summary;
+//# sourceMappingURL=summary.js.map
+
+/***/ }),
+
+/***/ 669:
+/***/ (function(module) {
+
+module.exports = require("util");
 
 /***/ }),
 
@@ -2769,6 +4807,158 @@ module.exports = {
   getDefaultSettingsPath,
   writeSettings
 }
+
+/***/ }),
+
+/***/ 681:
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+
+/**
+ * "Shallow freezes" an object to render it immutable.
+ * Uses `Object.freeze` if available,
+ * otherwise the immutability is only in the type.
+ *
+ * Is used to create "enum like" objects.
+ *
+ * @template T
+ * @param {T} object the object to freeze
+ * @param {Pick<ObjectConstructor, 'freeze'> = Object} oc `Object` by default,
+ * 				allows to inject custom object constructor for tests
+ * @returns {Readonly<T>}
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze
+ */
+function freeze(object, oc) {
+	if (oc === undefined) {
+		oc = Object
+	}
+	return oc && typeof oc.freeze === 'function' ? oc.freeze(object) : object
+}
+
+/**
+ * All mime types that are allowed as input to `DOMParser.parseFromString`
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString#Argument02 MDN
+ * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#domparsersupportedtype WHATWG HTML Spec
+ * @see DOMParser.prototype.parseFromString
+ */
+var MIME_TYPE = freeze({
+	/**
+	 * `text/html`, the only mime type that triggers treating an XML document as HTML.
+	 *
+	 * @see DOMParser.SupportedType.isHTML
+	 * @see https://www.iana.org/assignments/media-types/text/html IANA MimeType registration
+	 * @see https://en.wikipedia.org/wiki/HTML Wikipedia
+	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString MDN
+	 * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#dom-domparser-parsefromstring WHATWG HTML Spec
+	 */
+	HTML: 'text/html',
+
+	/**
+	 * Helper method to check a mime type if it indicates an HTML document
+	 *
+	 * @param {string} [value]
+	 * @returns {boolean}
+	 *
+	 * @see https://www.iana.org/assignments/media-types/text/html IANA MimeType registration
+	 * @see https://en.wikipedia.org/wiki/HTML Wikipedia
+	 * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString MDN
+	 * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#dom-domparser-parsefromstring 	 */
+	isHTML: function (value) {
+		return value === MIME_TYPE.HTML
+	},
+
+	/**
+	 * `application/xml`, the standard mime type for XML documents.
+	 *
+	 * @see https://www.iana.org/assignments/media-types/application/xml IANA MimeType registration
+	 * @see https://tools.ietf.org/html/rfc7303#section-9.1 RFC 7303
+	 * @see https://en.wikipedia.org/wiki/XML_and_MIME Wikipedia
+	 */
+	XML_APPLICATION: 'application/xml',
+
+	/**
+	 * `text/html`, an alias for `application/xml`.
+	 *
+	 * @see https://tools.ietf.org/html/rfc7303#section-9.2 RFC 7303
+	 * @see https://www.iana.org/assignments/media-types/text/xml IANA MimeType registration
+	 * @see https://en.wikipedia.org/wiki/XML_and_MIME Wikipedia
+	 */
+	XML_TEXT: 'text/xml',
+
+	/**
+	 * `application/xhtml+xml`, indicates an XML document that has the default HTML namespace,
+	 * but is parsed as an XML document.
+	 *
+	 * @see https://www.iana.org/assignments/media-types/application/xhtml+xml IANA MimeType registration
+	 * @see https://dom.spec.whatwg.org/#dom-domimplementation-createdocument WHATWG DOM Spec
+	 * @see https://en.wikipedia.org/wiki/XHTML Wikipedia
+	 */
+	XML_XHTML_APPLICATION: 'application/xhtml+xml',
+
+	/**
+	 * `image/svg+xml`,
+	 *
+	 * @see https://www.iana.org/assignments/media-types/image/svg+xml IANA MimeType registration
+	 * @see https://www.w3.org/TR/SVG11/ W3C SVG 1.1
+	 * @see https://en.wikipedia.org/wiki/Scalable_Vector_Graphics Wikipedia
+	 */
+	XML_SVG_IMAGE: 'image/svg+xml',
+})
+
+/**
+ * Namespaces that are used in this code base.
+ *
+ * @see http://www.w3.org/TR/REC-xml-names
+ */
+var NAMESPACE = freeze({
+	/**
+	 * The XHTML namespace.
+	 *
+	 * @see http://www.w3.org/1999/xhtml
+	 */
+	HTML: 'http://www.w3.org/1999/xhtml',
+
+	/**
+	 * Checks if `uri` equals `NAMESPACE.HTML`.
+	 *
+	 * @param {string} [uri]
+	 *
+	 * @see NAMESPACE.HTML
+	 */
+	isHTML: function (uri) {
+		return uri === NAMESPACE.HTML
+	},
+
+	/**
+	 * The SVG namespace.
+	 *
+	 * @see http://www.w3.org/2000/svg
+	 */
+	SVG: 'http://www.w3.org/2000/svg',
+
+	/**
+	 * The `xml:` namespace.
+	 *
+	 * @see http://www.w3.org/XML/1998/namespace
+	 */
+	XML: 'http://www.w3.org/XML/1998/namespace',
+
+	/**
+	 * The `xmlns:` namespace
+	 *
+	 * @see https://www.w3.org/2000/xmlns/
+	 */
+	XMLNS: 'http://www.w3.org/2000/xmlns/',
+})
+
+exports.freeze = freeze;
+exports.MIME_TYPE = MIME_TYPE;
+exports.NAMESPACE = NAMESPACE;
+
 
 /***/ }),
 
@@ -2879,12 +5069,32 @@ function processElementNode(node, state, preserveSpace) {
         let nodePreserveSpace = node.attributes['xml:space'] === 'preserve';
 
         if (!nodePreserveSpace && state.options.collapseContent) {
+            let containsTextNodes = false;
+            let containsTextNodesWithLineBreaks = false;
+            let containsNonTextNodes = false;
 
-            const containsTextNodes = node.children.some(function(child) {
-                return child.type === 'Text' && child.content.trim() !== '';
+            node.children.forEach(function(child, index) {
+                if (child.type === 'Text') {
+                    if (child.content.includes('\n')) {
+                        containsTextNodesWithLineBreaks = true;
+                        child.content = child.content.trim();
+                    } else if (index === 0 || index === node.children.length - 1) {
+                        if (child.content.trim().length === 0) {
+                            // If the text node is at the start or end and is empty, it should be ignored when formatting
+                            child.content = '';
+                        }
+                    }
+                    if (child.content.length > 0) {
+                        containsTextNodes = true;
+                    }
+                } else if (child.type === 'CDATA') {
+                    containsTextNodes = true;
+                } else {
+                    containsNonTextNodes = true;
+                }
             });
 
-            if (containsTextNodes) {
+            if (containsTextNodes && (!containsNonTextNodes || !containsTextNodesWithLineBreaks)) {
                 nodePreserveSpace = true;
             }
         }
@@ -2954,7 +5164,9 @@ function format(xml, options = {}) {
         processNode(child, state, false);
     });
 
-    return state.content;
+    return state.content
+        .replace(/\r\n/g, '\n')
+        .replace(/\n/g, options.lineSeparator);
 }
 
 
@@ -2963,8 +5175,20 @@ module.exports = format;
 
 /***/ }),
 
-/***/ 721:
+/***/ 731:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+var conventions = __webpack_require__(681);
+var dom = __webpack_require__(476)
+var entities = __webpack_require__(225);
+var sax = __webpack_require__(286);
+
+var DOMImplementation = dom.DOMImplementation;
+
+var NAMESPACE = conventions.NAMESPACE;
+
+var ParseError = sax.ParseError;
+var XMLReader = sax.XMLReader;
 
 function DOMParser(options){
 	this.options = options ||{locator:{}};
@@ -2978,7 +5202,7 @@ DOMParser.prototype.parseFromString = function(source,mimeType){
 	var locator = options.locator;
 	var defaultNSMap = options.xmlns||{};
 	var isHTML = /\/x?html?$/.test(mimeType);//mimeType.toLowerCase().indexOf('html') > -1;
-  	var entityMap = isHTML?htmlEntity.entityMap:{'lt':'<','gt':'>','amp':'&','quot':'"','apos':"'"};
+  	var entityMap = isHTML ? entities.HTML_ENTITIES : entities.XML_ENTITIES;
 	if(locator){
 		domBuilder.setDocumentLocator(locator)
 	}
@@ -2986,9 +5210,9 @@ DOMParser.prototype.parseFromString = function(source,mimeType){
 	sax.errorHandler = buildErrorHandler(errorHandler,domBuilder,locator);
 	sax.domBuilder = options.domBuilder || domBuilder;
 	if(isHTML){
-		defaultNSMap['']= 'http://www.w3.org/1999/xhtml';
+		defaultNSMap[''] = NAMESPACE.HTML;
 	}
-	defaultNSMap.xml = defaultNSMap.xml || 'http://www.w3.org/XML/1998/namespace';
+	defaultNSMap.xml = defaultNSMap.xml || NAMESPACE.XML;
 	if(source && typeof source === 'string'){
 		sax.parse(source,defaultNSMap,entityMap);
 	}else{
@@ -3133,6 +5357,7 @@ DOMHandler.prototype = {
 	        var dt = impl.createDocumentType(name, publicId, systemId);
 	        this.locator && position(this.locator,dt)
 	        appendElement(this, dt);
+					this.doc.doctype = dt;
 	    }
 	},
 	/**
@@ -3209,267 +5434,103 @@ function appendElement (hander,node) {
     }
 }//appendChild and setAttributeNS are preformance key
 
-//if(typeof require == 'function'){
-var htmlEntity = __webpack_require__(740);
-var sax = __webpack_require__(503);
-var XMLReader = sax.XMLReader;
-var ParseError = sax.ParseError;
-var DOMImplementation = exports.DOMImplementation = __webpack_require__(440).DOMImplementation;
-exports.XMLSerializer = __webpack_require__(440).XMLSerializer ;
-exports.DOMParser = DOMParser;
 exports.__DOMHandler = DOMHandler;
-//}
+exports.DOMParser = DOMParser;
+
+/**
+ * @deprecated Import/require from main entry point instead
+ */
+exports.DOMImplementation = dom.DOMImplementation;
+
+/**
+ * @deprecated Import/require from main entry point instead
+ */
+exports.XMLSerializer = dom.XMLSerializer;
 
 
 /***/ }),
 
-/***/ 740:
-/***/ (function(__unusedmodule, exports) {
+/***/ 742:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-exports.entityMap = {
-       lt: '<',
-       gt: '>',
-       amp: '&',
-       quot: '"',
-       apos: "'",
-       Agrave: "À",
-       Aacute: "Á",
-       Acirc: "Â",
-       Atilde: "Ã",
-       Auml: "Ä",
-       Aring: "Å",
-       AElig: "Æ",
-       Ccedil: "Ç",
-       Egrave: "È",
-       Eacute: "É",
-       Ecirc: "Ê",
-       Euml: "Ë",
-       Igrave: "Ì",
-       Iacute: "Í",
-       Icirc: "Î",
-       Iuml: "Ï",
-       ETH: "Ð",
-       Ntilde: "Ñ",
-       Ograve: "Ò",
-       Oacute: "Ó",
-       Ocirc: "Ô",
-       Otilde: "Õ",
-       Ouml: "Ö",
-       Oslash: "Ø",
-       Ugrave: "Ù",
-       Uacute: "Ú",
-       Ucirc: "Û",
-       Uuml: "Ü",
-       Yacute: "Ý",
-       THORN: "Þ",
-       szlig: "ß",
-       agrave: "à",
-       aacute: "á",
-       acirc: "â",
-       atilde: "ã",
-       auml: "ä",
-       aring: "å",
-       aelig: "æ",
-       ccedil: "ç",
-       egrave: "è",
-       eacute: "é",
-       ecirc: "ê",
-       euml: "ë",
-       igrave: "ì",
-       iacute: "í",
-       icirc: "î",
-       iuml: "ï",
-       eth: "ð",
-       ntilde: "ñ",
-       ograve: "ò",
-       oacute: "ó",
-       ocirc: "ô",
-       otilde: "õ",
-       ouml: "ö",
-       oslash: "ø",
-       ugrave: "ù",
-       uacute: "ú",
-       ucirc: "û",
-       uuml: "ü",
-       yacute: "ý",
-       thorn: "þ",
-       yuml: "ÿ",
-       nbsp: "\u00a0",
-       iexcl: "¡",
-       cent: "¢",
-       pound: "£",
-       curren: "¤",
-       yen: "¥",
-       brvbar: "¦",
-       sect: "§",
-       uml: "¨",
-       copy: "©",
-       ordf: "ª",
-       laquo: "«",
-       not: "¬",
-       shy: "­­",
-       reg: "®",
-       macr: "¯",
-       deg: "°",
-       plusmn: "±",
-       sup2: "²",
-       sup3: "³",
-       acute: "´",
-       micro: "µ",
-       para: "¶",
-       middot: "·",
-       cedil: "¸",
-       sup1: "¹",
-       ordm: "º",
-       raquo: "»",
-       frac14: "¼",
-       frac12: "½",
-       frac34: "¾",
-       iquest: "¿",
-       times: "×",
-       divide: "÷",
-       forall: "∀",
-       part: "∂",
-       exist: "∃",
-       empty: "∅",
-       nabla: "∇",
-       isin: "∈",
-       notin: "∉",
-       ni: "∋",
-       prod: "∏",
-       sum: "∑",
-       minus: "−",
-       lowast: "∗",
-       radic: "√",
-       prop: "∝",
-       infin: "∞",
-       ang: "∠",
-       and: "∧",
-       or: "∨",
-       cap: "∩",
-       cup: "∪",
-       'int': "∫",
-       there4: "∴",
-       sim: "∼",
-       cong: "≅",
-       asymp: "≈",
-       ne: "≠",
-       equiv: "≡",
-       le: "≤",
-       ge: "≥",
-       sub: "⊂",
-       sup: "⊃",
-       nsub: "⊄",
-       sube: "⊆",
-       supe: "⊇",
-       oplus: "⊕",
-       otimes: "⊗",
-       perp: "⊥",
-       sdot: "⋅",
-       Alpha: "Α",
-       Beta: "Β",
-       Gamma: "Γ",
-       Delta: "Δ",
-       Epsilon: "Ε",
-       Zeta: "Ζ",
-       Eta: "Η",
-       Theta: "Θ",
-       Iota: "Ι",
-       Kappa: "Κ",
-       Lambda: "Λ",
-       Mu: "Μ",
-       Nu: "Ν",
-       Xi: "Ξ",
-       Omicron: "Ο",
-       Pi: "Π",
-       Rho: "Ρ",
-       Sigma: "Σ",
-       Tau: "Τ",
-       Upsilon: "Υ",
-       Phi: "Φ",
-       Chi: "Χ",
-       Psi: "Ψ",
-       Omega: "Ω",
-       alpha: "α",
-       beta: "β",
-       gamma: "γ",
-       delta: "δ",
-       epsilon: "ε",
-       zeta: "ζ",
-       eta: "η",
-       theta: "θ",
-       iota: "ι",
-       kappa: "κ",
-       lambda: "λ",
-       mu: "μ",
-       nu: "ν",
-       xi: "ξ",
-       omicron: "ο",
-       pi: "π",
-       rho: "ρ",
-       sigmaf: "ς",
-       sigma: "σ",
-       tau: "τ",
-       upsilon: "υ",
-       phi: "φ",
-       chi: "χ",
-       psi: "ψ",
-       omega: "ω",
-       thetasym: "ϑ",
-       upsih: "ϒ",
-       piv: "ϖ",
-       OElig: "Œ",
-       oelig: "œ",
-       Scaron: "Š",
-       scaron: "š",
-       Yuml: "Ÿ",
-       fnof: "ƒ",
-       circ: "ˆ",
-       tilde: "˜",
-       ensp: " ",
-       emsp: " ",
-       thinsp: " ",
-       zwnj: "‌",
-       zwj: "‍",
-       lrm: "‎",
-       rlm: "‏",
-       ndash: "–",
-       mdash: "—",
-       lsquo: "‘",
-       rsquo: "’",
-       sbquo: "‚",
-       ldquo: "“",
-       rdquo: "”",
-       bdquo: "„",
-       dagger: "†",
-       Dagger: "‡",
-       bull: "•",
-       hellip: "…",
-       permil: "‰",
-       prime: "′",
-       Prime: "″",
-       lsaquo: "‹",
-       rsaquo: "›",
-       oline: "‾",
-       euro: "€",
-       trade: "™",
-       larr: "←",
-       uarr: "↑",
-       rarr: "→",
-       darr: "↓",
-       harr: "↔",
-       crarr: "↵",
-       lceil: "⌈",
-       rceil: "⌉",
-       lfloor: "⌊",
-       rfloor: "⌋",
-       loz: "◊",
-       spades: "♠",
-       clubs: "♣",
-       hearts: "♥",
-       diams: "♦"
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
 };
-
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OidcClient = void 0;
+const http_client_1 = __webpack_require__(425);
+const auth_1 = __webpack_require__(554);
+const core_1 = __webpack_require__(470);
+class OidcClient {
+    static createHttpClient(allowRetry = true, maxRetry = 10) {
+        const requestOptions = {
+            allowRetries: allowRetry,
+            maxRetries: maxRetry
+        };
+        return new http_client_1.HttpClient('actions/oidc-client', [new auth_1.BearerCredentialHandler(OidcClient.getRequestToken())], requestOptions);
+    }
+    static getRequestToken() {
+        const token = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
+        if (!token) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_TOKEN env variable');
+        }
+        return token;
+    }
+    static getIDTokenUrl() {
+        const runtimeUrl = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
+        if (!runtimeUrl) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable');
+        }
+        return runtimeUrl;
+    }
+    static getCall(id_token_url) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const httpclient = OidcClient.createHttpClient();
+            const res = yield httpclient
+                .getJson(id_token_url)
+                .catch(error => {
+                throw new Error(`Failed to get ID Token. \n 
+        Error Code : ${error.statusCode}\n 
+        Error Message: ${error.result.message}`);
+            });
+            const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
+            if (!id_token) {
+                throw new Error('Response json body do not have ID Token field');
+            }
+            return id_token;
+        });
+    }
+    static getIDToken(audience) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // New ID Token is requested from action service
+                let id_token_url = OidcClient.getIDTokenUrl();
+                if (audience) {
+                    const encodedAudience = encodeURIComponent(audience);
+                    id_token_url = `${id_token_url}&audience=${encodedAudience}`;
+                }
+                core_1.debug(`ID token url is ${id_token_url}`);
+                const id_token = yield OidcClient.getCall(id_token_url);
+                core_1.setSecret(id_token);
+                return id_token;
+            }
+            catch (error) {
+                throw new Error(`Error message: ${error.message}`);
+            }
+        });
+    }
+}
+exports.OidcClient = OidcClient;
+//# sourceMappingURL=oidc-utils.js.map
 
 /***/ }),
 
@@ -3486,8 +5547,8 @@ module.exports = require("fs");
 var core = __webpack_require__(470);
 var path = __webpack_require__(622);
 var fs = __webpack_require__(747);
-var DOMParser = __webpack_require__(721).DOMParser;
-var XMLSerializer = __webpack_require__(721).XMLSerializer;
+var DOMParser = __webpack_require__(518).DOMParser;
+var XMLSerializer = __webpack_require__(518).XMLSerializer;
 var format = __webpack_require__(701);
 
 function getSettingsTemplate() {
