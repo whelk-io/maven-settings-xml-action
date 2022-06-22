@@ -102,7 +102,7 @@ Reference: [Maven Settings > Proxies](https://maven.apache.org/settings.html#pro
 
 When using a custom `output_file`, for example:
 ```yaml
-- uses: whelk-io/maven-settings-xml-action@v18
+- uses: whelk-io/maven-settings-xml-action@v20
   with:
     output_file: foo/custom.xml
 ```
@@ -115,7 +115,7 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v18
+  uses: whelk-io/maven-settings-xml-action@v20
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
@@ -169,7 +169,7 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v18
+  uses: whelk-io/maven-settings-xml-action@v20
   with:
     repositories: >
       [
@@ -178,10 +178,14 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
           "name": "some-repository-name",
           "url": "http://some.repository.url",
           "releases": {
-            "enabled": "true"
+            "enabled": "true",
+            "updatePolicy": "always",
+            "checksumPolicy": "fail"
           },
           "snapshots": {
-            "enabled": "false"
+            "enabled": "false",
+            "updatePolicy": "always",
+            "checksumPolicy": "fail"
           }
         }
       ]
@@ -281,9 +285,13 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
                     <url>http://some.repository.url</url>
                     <releases>
                         <enabled>true</enabled>
+                        <updatePolicy>always</updatePolicy>
+                        <checksumPolicy>fail</checksumPolicy>
                     </releases>
                     <snapshots>
                         <enabled>false</enabled>
+                        <updatePolicy>always</updatePolicy>
+                        <checksumPolicy>fail</checksumPolicy>
                     </snapshots>
                 </repository>
             </repositories>
