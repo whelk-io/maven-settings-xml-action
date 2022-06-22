@@ -1107,7 +1107,6 @@ ParseError.prototype = new Error();
 ParseError.prototype.name = ParseError.name
 
 function XMLReader(){
-
 }
 
 XMLReader.prototype = {
@@ -1166,7 +1165,6 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 	var lineEnd = 0;
 	var linePattern = /.*(?:\r\n?|\n)|.*$/g
 	var locator = domBuilder.locator;
-
 	var parseStack = [{currentNSMap:defaultNSMapCopy}]
 	var closeMap = {};
 	var start = 0;
@@ -1191,7 +1189,6 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 				var tagName = source.substring(tagStart + 2, end).replace(/[ \t\n\r]+$/g, '');
 				var config = parseStack.pop();
 				if(end<0){
-
 	        		tagName = source.substring(tagStart+2).replace(/[\s<].*/,'');
 	        		errorHandler.error("end tag name: "+tagName+' is not complete:'+config.tagName);
 	        		end = tagStart+1+tagName.length;
@@ -1218,7 +1215,6 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 		        }else{
 		        	parseStack.push(config)
 		        }
-
 				end++;
 				break;
 				// end elment
@@ -1530,7 +1526,6 @@ function appendElement(el,domBuilder,currentNSMap){
 				a.uri = NAMESPACE.XML;
 			}if(prefix !== 'xmlns'){
 				a.uri = currentNSMap[prefix || '']
-
 				//{console.log('###'+a.qName,domBuilder.locator.systemId+'',currentNSMap,a.uri)}
 			}
 		}
@@ -1581,7 +1576,6 @@ function parseHtmlSpecialContent(source,elStartEnd,tagName,entityReplacer,domBui
 				domBuilder.characters(text,0,text.length);
 				return elEndStart;
 			//}
-
 		}
 	}
 	return elStartEnd+1;
@@ -1654,7 +1648,6 @@ function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
 			var lastMatch = matchs[len-1]
 			domBuilder.startDTD(name, pubid, sysid);
 			domBuilder.endDTD();
-
 			return lastMatch.index+lastMatch[0].length
 		}
 	}
