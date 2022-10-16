@@ -29,6 +29,9 @@
     "copy_templates": "rm -rf dist/template && mkdir dist/template && cp -a template/. dist/template/",
     "build": "npm run build_index && npm run copy_templates"
   },
+  "engines": {
+    "node": "16.x"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/whelk-io/maven-settings-xml-action.git"
