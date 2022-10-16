@@ -50,6 +50,168 @@ module.exports = require("tls");
 
 /***/ }),
 
+/***/ 22:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _validate = _interopRequireDefault(__webpack_require__(78));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function parse(uuid) {
+  if (!(0, _validate.default)(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+
+  let v;
+  const arr = new Uint8Array(16); // Parse ########-....-....-....-............
+
+  arr[0] = (v = parseInt(uuid.slice(0, 8), 16)) >>> 24;
+  arr[1] = v >>> 16 & 0xff;
+  arr[2] = v >>> 8 & 0xff;
+  arr[3] = v & 0xff; // Parse ........-####-....-....-............
+
+  arr[4] = (v = parseInt(uuid.slice(9, 13), 16)) >>> 8;
+  arr[5] = v & 0xff; // Parse ........-....-####-....-............
+
+  arr[6] = (v = parseInt(uuid.slice(14, 18), 16)) >>> 8;
+  arr[7] = v & 0xff; // Parse ........-....-....-####-............
+
+  arr[8] = (v = parseInt(uuid.slice(19, 23), 16)) >>> 8;
+  arr[9] = v & 0xff; // Parse ........-....-....-....-############
+  // (Use "/" to avoid 32-bit truncation when bit-shifting high-order bytes)
+
+  arr[10] = (v = parseInt(uuid.slice(24, 36), 16)) / 0x10000000000 & 0xff;
+  arr[11] = v / 0x100000000 & 0xff;
+  arr[12] = v >>> 24 & 0xff;
+  arr[13] = v >>> 16 & 0xff;
+  arr[14] = v >>> 8 & 0xff;
+  arr[15] = v & 0xff;
+  return arr;
+}
+
+var _default = parse;
+exports.default = _default;
+
+/***/ }),
+
+/***/ 62:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "v1", {
+  enumerable: true,
+  get: function () {
+    return _v.default;
+  }
+});
+Object.defineProperty(exports, "v3", {
+  enumerable: true,
+  get: function () {
+    return _v2.default;
+  }
+});
+Object.defineProperty(exports, "v4", {
+  enumerable: true,
+  get: function () {
+    return _v3.default;
+  }
+});
+Object.defineProperty(exports, "v5", {
+  enumerable: true,
+  get: function () {
+    return _v4.default;
+  }
+});
+Object.defineProperty(exports, "NIL", {
+  enumerable: true,
+  get: function () {
+    return _nil.default;
+  }
+});
+Object.defineProperty(exports, "version", {
+  enumerable: true,
+  get: function () {
+    return _version.default;
+  }
+});
+Object.defineProperty(exports, "validate", {
+  enumerable: true,
+  get: function () {
+    return _validate.default;
+  }
+});
+Object.defineProperty(exports, "stringify", {
+  enumerable: true,
+  get: function () {
+    return _stringify.default;
+  }
+});
+Object.defineProperty(exports, "parse", {
+  enumerable: true,
+  get: function () {
+    return _parse.default;
+  }
+});
+
+var _v = _interopRequireDefault(__webpack_require__(893));
+
+var _v2 = _interopRequireDefault(__webpack_require__(209));
+
+var _v3 = _interopRequireDefault(__webpack_require__(733));
+
+var _v4 = _interopRequireDefault(__webpack_require__(384));
+
+var _nil = _interopRequireDefault(__webpack_require__(327));
+
+var _version = _interopRequireDefault(__webpack_require__(695));
+
+var _validate = _interopRequireDefault(__webpack_require__(78));
+
+var _stringify = _interopRequireDefault(__webpack_require__(411));
+
+var _parse = _interopRequireDefault(__webpack_require__(22));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/***/ }),
+
+/***/ 78:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _regex = _interopRequireDefault(__webpack_require__(456));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function validate(uuid) {
+  return typeof uuid === 'string' && _regex.default.test(uuid);
+}
+
+var _default = validate;
+exports.default = _default;
+
+/***/ }),
+
 /***/ 82:
 /***/ (function(__unusedmodule, exports) {
 
@@ -130,13 +292,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.issueCommand = void 0;
+exports.prepareKeyValueMessage = exports.issueFileCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fs = __importStar(__webpack_require__(747));
 const os = __importStar(__webpack_require__(87));
+const uuid_1 = __webpack_require__(62);
 const utils_1 = __webpack_require__(82);
-function issueCommand(command, message) {
+function issueFileCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
     if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
@@ -148,7 +311,22 @@ function issueCommand(command, message) {
         encoding: 'utf8'
     });
 }
-exports.issueCommand = issueCommand;
+exports.issueFileCommand = issueFileCommand;
+function prepareKeyValueMessage(key, value) {
+    const delimiter = `ghadelimiter_${uuid_1.v4()}`;
+    const convertedValue = utils_1.toCommandValue(value);
+    // These should realistically never happen, but just in case someone finds a
+    // way to exploit uuid generation let's not allow keys or values that contain
+    // the delimiter.
+    if (key.includes(delimiter)) {
+        throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
+    }
+    if (convertedValue.includes(delimiter)) {
+        throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
+    }
+    return `${key}<<${delimiter}${os.EOL}${convertedValue}${os.EOL}${delimiter}`;
+}
+exports.prepareKeyValueMessage = prepareKeyValueMessage;
 //# sourceMappingURL=file-command.js.map
 
 /***/ }),
@@ -493,10 +671,118 @@ exports.checkBypass = checkBypass;
 
 /***/ }),
 
+/***/ 209:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _v = _interopRequireDefault(__webpack_require__(212));
+
+var _md = _interopRequireDefault(__webpack_require__(803));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+const v3 = (0, _v.default)('v3', 0x30, _md.default);
+var _default = v3;
+exports.default = _default;
+
+/***/ }),
+
 /***/ 211:
 /***/ (function(module) {
 
 module.exports = require("https");
+
+/***/ }),
+
+/***/ 212:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = _default;
+exports.URL = exports.DNS = void 0;
+
+var _stringify = _interopRequireDefault(__webpack_require__(411));
+
+var _parse = _interopRequireDefault(__webpack_require__(22));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function stringToBytes(str) {
+  str = unescape(encodeURIComponent(str)); // UTF8 escape
+
+  const bytes = [];
+
+  for (let i = 0; i < str.length; ++i) {
+    bytes.push(str.charCodeAt(i));
+  }
+
+  return bytes;
+}
+
+const DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+exports.DNS = DNS;
+const URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
+exports.URL = URL;
+
+function _default(name, version, hashfunc) {
+  function generateUUID(value, namespace, buf, offset) {
+    if (typeof value === 'string') {
+      value = stringToBytes(value);
+    }
+
+    if (typeof namespace === 'string') {
+      namespace = (0, _parse.default)(namespace);
+    }
+
+    if (namespace.length !== 16) {
+      throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
+    } // Compute hash of namespace and value, Per 4.3
+    // Future: Use spread syntax when supported on all platforms, e.g. `bytes =
+    // hashfunc([...namespace, ... value])`
+
+
+    let bytes = new Uint8Array(16 + value.length);
+    bytes.set(namespace);
+    bytes.set(value, namespace.length);
+    bytes = hashfunc(bytes);
+    bytes[6] = bytes[6] & 0x0f | version;
+    bytes[8] = bytes[8] & 0x3f | 0x80;
+
+    if (buf) {
+      offset = offset || 0;
+
+      for (let i = 0; i < 16; ++i) {
+        buf[offset + i] = bytes[i];
+      }
+
+      return buf;
+    }
+
+    return (0, _stringify.default)(bytes);
+  } // Function#name is not settable on some platforms (#270)
+
+
+  try {
+    generateUUID.name = name; // eslint-disable-next-line no-empty
+  } catch (err) {} // For CommonJS default export support
+
+
+  generateUUID.DNS = DNS;
+  generateUUID.URL = URL;
+  return generateUUID;
+}
 
 /***/ }),
 
@@ -797,7 +1083,7 @@ var tagNamePattern = new RegExp('^'+nameStartChar.source+nameChar.source+'*(?:\:
 //S_TAG,	S_ATTR,	S_EQ,	S_ATTR_NOQUOT_VALUE
 //S_ATTR_SPACE,	S_ATTR_END,	S_TAG_SPACE, S_TAG_CLOSE
 var S_TAG = 0;//tag name offerring
-var S_ATTR = 1;//attr name offerring 
+var S_ATTR = 1;//attr name offerring
 var S_ATTR_SPACE=2;//attr name end and space offer
 var S_EQ = 3;//=space?
 var S_ATTR_NOQUOT_VALUE = 4;//attr value(no quot value only)
@@ -821,7 +1107,7 @@ ParseError.prototype = new Error();
 ParseError.prototype.name = ParseError.name
 
 function XMLReader(){
-	
+
 }
 
 XMLReader.prototype = {
@@ -850,8 +1136,8 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 	}
 	function entityReplacer(a){
 		var k = a.slice(1,-1);
-		if(k in entityMap){
-			return entityMap[k]; 
+		if (Object.hasOwnProperty.call(entityMap, k)) {
+			return entityMap[k];
 		}else if(k.charAt(0) === '#'){
 			return fixedFromCharCode(parseInt(k.substr(1).replace('x','0x')))
 		}else{
@@ -880,7 +1166,7 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 	var lineEnd = 0;
 	var linePattern = /.*(?:\r\n?|\n)|.*$/g
 	var locator = domBuilder.locator;
-	
+
 	var parseStack = [{currentNSMap:defaultNSMapCopy}]
 	var closeMap = {};
 	var start = 0;
@@ -905,7 +1191,7 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 				var tagName = source.substring(tagStart + 2, end).replace(/[ \t\n\r]+$/g, '');
 				var config = parseStack.pop();
 				if(end<0){
-					
+
 	        		tagName = source.substring(tagStart+2).replace(/[\s<].*/,'');
 	        		errorHandler.error("end tag name: "+tagName+' is not complete:'+config.tagName);
 	        		end = tagStart+1+tagName.length;
@@ -920,8 +1206,10 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 		        if(endIgnoreCaseMach){
 		        	domBuilder.endElement(config.uri,config.localName,tagName);
 					if(localNSMap){
-						for(var prefix in localNSMap){
-							domBuilder.endPrefixMapping(prefix) ;
+						for (var prefix in localNSMap) {
+							if (Object.prototype.hasOwnProperty.call(localNSMap, prefix)) {
+								domBuilder.endPrefixMapping(prefix);
+							}
 						}
 					}
 					if(!endMatch){
@@ -930,7 +1218,7 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 		        }else{
 		        	parseStack.push(config)
 		        }
-				
+
 				end++;
 				break;
 				// end elment
@@ -949,8 +1237,8 @@ function parse(source,defaultNSMapCopy,entityMap,domBuilder,errorHandler){
 				//elStartEnd
 				var end = parseElementStartPart(source,tagStart,el,currentNSMap,entityReplacer,errorHandler);
 				var len = el.length;
-				
-				
+
+
 				if(!el.closed && fixSelfClosed(source,end,el.tagName,closeMap)){
 					el.closed = true;
 					if(!entityMap.nbsp){
@@ -1018,7 +1306,15 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 		if (el.attributeNames.hasOwnProperty(qname)) {
 			errorHandler.fatalError('Attribute ' + qname + ' redefined')
 		}
-		el.addValue(qname, value, startIndex)
+		el.addValue(
+			qname,
+			// @see https://www.w3.org/TR/xml/#AVNormalize
+			// since the xmldom sax parser does not "interpret" DTD the following is not implemented:
+			// - recursive replacement of (DTD) entity references
+			// - trimming and collapsing multiple spaces into a single one for attributes that are not of type CDATA
+			value.replace(/[\t\n\r]/g, ' ').replace(/&#?\w+;/g, entityReplacer),
+			startIndex
+		)
 	}
 	var attrName;
 	var value;
@@ -1049,7 +1345,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 				start = p+1;
 				p = source.indexOf(c,start)
 				if(p>0){
-					value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+					value = source.slice(start, p);
 					addAttribute(attrName, value, start-1);
 					s = S_ATTR_END;
 				}else{
@@ -1057,10 +1353,8 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 					throw new Error('attribute value no end \''+c+'\' match');
 				}
 			}else if(s == S_ATTR_NOQUOT_VALUE){
-				value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
-				//console.log(attrName,value,start,p)
+				value = source.slice(start, p);
 				addAttribute(attrName, value, start);
-				//console.dir(el)
 				errorHandler.warning('attribute "'+attrName+'" missed start quot('+c+')!!');
 				start = p+1;
 				s = S_ATTR_END
@@ -1114,7 +1408,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 				}
 				if(s == S_ATTR_NOQUOT_VALUE){
 					errorHandler.warning('attribute "'+value+'" missed quot(")!');
-					addAttribute(attrName, value.replace(/&#?\w+;/g,entityReplacer), start)
+					addAttribute(attrName, value, start)
 				}else{
 					if(!NAMESPACE.isHTML(currentNSMap['']) || !value.match(/^(?:disabled|checked|selected)$/i)){
 						errorHandler.warning('attribute "'+value+'" missed value!! "'+value+'" instead!!')
@@ -1142,7 +1436,7 @@ function parseElementStartPart(source,start,el,currentNSMap,entityReplacer,error
 					s = S_ATTR_SPACE;
 					break;
 				case S_ATTR_NOQUOT_VALUE:
-					var value = source.slice(start,p).replace(/&#?\w+;/g,entityReplacer);
+					var value = source.slice(start, p);
 					errorHandler.warning('attribute "'+value+'" missed quot(")!!');
 					addAttribute(attrName, value, start)
 				case S_ATTR_END:
@@ -1214,7 +1508,7 @@ function appendElement(el,domBuilder,currentNSMap){
 		}
 		//can not set prefix,because prefix !== ''
 		a.localName = localName ;
-		//prefix == null for no ns prefix attribute 
+		//prefix == null for no ns prefix attribute
 		if(nsPrefix !== false){//hack!!
 			if(localNSMap == null){
 				localNSMap = {}
@@ -1224,7 +1518,7 @@ function appendElement(el,domBuilder,currentNSMap){
 			}
 			currentNSMap[nsPrefix] = localNSMap[nsPrefix] = value;
 			a.uri = NAMESPACE.XMLNS
-			domBuilder.startPrefixMapping(nsPrefix, value) 
+			domBuilder.startPrefixMapping(nsPrefix, value)
 		}
 	}
 	var i = el.length;
@@ -1236,7 +1530,7 @@ function appendElement(el,domBuilder,currentNSMap){
 				a.uri = NAMESPACE.XML;
 			}if(prefix !== 'xmlns'){
 				a.uri = currentNSMap[prefix || '']
-				
+
 				//{console.log('###'+a.qName,domBuilder.locator.systemId+'',currentNSMap,a.uri)}
 			}
 		}
@@ -1257,8 +1551,10 @@ function appendElement(el,domBuilder,currentNSMap){
 	if(el.closed){
 		domBuilder.endElement(ns,localName,tagName);
 		if(localNSMap){
-			for(prefix in localNSMap){
-				domBuilder.endPrefixMapping(prefix) 
+			for (prefix in localNSMap) {
+				if (Object.prototype.hasOwnProperty.call(localNSMap, prefix)) {
+					domBuilder.endPrefixMapping(prefix);
+				}
 			}
 		}
 	}else{
@@ -1285,7 +1581,7 @@ function parseHtmlSpecialContent(source,elStartEnd,tagName,entityReplacer,domBui
 				domBuilder.characters(text,0,text.length);
 				return elEndStart;
 			//}
-			
+
 		}
 	}
 	return elStartEnd+1;
@@ -1302,11 +1598,17 @@ function fixSelfClosed(source,elStartEnd,tagName,closeMap){
 		closeMap[tagName] =pos
 	}
 	return pos<elStartEnd;
-	//} 
+	//}
 }
-function _copy(source,target){
-	for(var n in source){target[n] = source[n]}
+
+function _copy (source, target) {
+	for (var n in source) {
+		if (Object.prototype.hasOwnProperty.call(source, n)) {
+			target[n] = source[n];
+		}
+	}
 }
+
 function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
 	var next= source.charAt(start+2)
 	switch(next){
@@ -1330,11 +1632,11 @@ function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
 			var end = source.indexOf(']]>',start+9);
 			domBuilder.startCDATA();
 			domBuilder.characters(source,start+9,end-start-9);
-			domBuilder.endCDATA() 
+			domBuilder.endCDATA()
 			return end+3;
 		}
 		//<!DOCTYPE
-		//startDTD(java.lang.String name, java.lang.String publicId, java.lang.String systemId) 
+		//startDTD(java.lang.String name, java.lang.String publicId, java.lang.String systemId)
 		var matchs = split(source,start);
 		var len = matchs.length;
 		if(len>1 && /!doctype/i.test(matchs[0][0])){
@@ -1352,7 +1654,7 @@ function parseDCC(source,start,domBuilder,errorHandler){//sure start with '<!'
 			var lastMatch = matchs[len-1]
 			domBuilder.startDTD(name, pubid, sysid);
 			domBuilder.endDTD();
-			
+
 			return lastMatch.index+lastMatch[0].length
 		}
 	}
@@ -1401,7 +1703,7 @@ ElementAttributes.prototype = {
 	getValue:function(i){return this[i].value}
 //	,getIndex:function(uri, localName)){
 //		if(localName){
-//			
+//
 //		}else{
 //			var qName = uri
 //		}
@@ -1431,10 +1733,94 @@ exports.ParseError = ParseError;
 
 /***/ }),
 
+/***/ 327:
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = '00000000-0000-0000-0000-000000000000';
+exports.default = _default;
+
+/***/ }),
+
 /***/ 357:
 /***/ (function(module) {
 
 module.exports = require("assert");
+
+/***/ }),
+
+/***/ 384:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _v = _interopRequireDefault(__webpack_require__(212));
+
+var _sha = _interopRequireDefault(__webpack_require__(498));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+const v5 = (0, _v.default)('v5', 0x50, _sha.default);
+var _default = v5;
+exports.default = _default;
+
+/***/ }),
+
+/***/ 411:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _validate = _interopRequireDefault(__webpack_require__(78));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * Convert array of 16 byte values to UUID string format of the form:
+ * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+ */
+const byteToHex = [];
+
+for (let i = 0; i < 256; ++i) {
+  byteToHex.push((i + 0x100).toString(16).substr(1));
+}
+
+function stringify(arr, offset = 0) {
+  // Note: Be careful editing this code!  It's been tuned for performance
+  // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
+  const uuid = (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase(); // Consistency check for valid UUID.  If this throws, it's likely due to one
+  // of the following:
+  // - One or more input array values don't map to a hex octet (leading to
+  // "undefined" in the uuid)
+  // - Invalid input values for the RFC `version` or `variant` fields
+
+  if (!(0, _validate.default)(uuid)) {
+    throw TypeError('Stringified UUID is invalid');
+  }
+
+  return uuid;
+}
+
+var _default = stringify;
+exports.default = _default;
 
 /***/ }),
 
@@ -1443,6 +1829,13 @@ module.exports = require("assert");
 
 module.exports = __webpack_require__(141);
 
+
+/***/ }),
+
+/***/ 417:
+/***/ (function(module) {
+
+module.exports = require("crypto");
 
 /***/ }),
 
@@ -2157,6 +2550,21 @@ function escapeProperty(s) {
 
 /***/ }),
 
+/***/ 456:
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
+exports.default = _default;
+
+/***/ }),
+
 /***/ 470:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -2226,13 +2634,9 @@ function exportVariable(name, val) {
     process.env[name] = convertedVal;
     const filePath = process.env['GITHUB_ENV'] || '';
     if (filePath) {
-        const delimiter = '_GitHubActionsFileCommandDelimeter_';
-        const commandValue = `${name}<<${delimiter}${os.EOL}${convertedVal}${os.EOL}${delimiter}`;
-        file_command_1.issueCommand('ENV', commandValue);
+        return file_command_1.issueFileCommand('ENV', file_command_1.prepareKeyValueMessage(name, val));
     }
-    else {
-        command_1.issueCommand('set-env', { name }, convertedVal);
-    }
+    command_1.issueCommand('set-env', { name }, convertedVal);
 }
 exports.exportVariable = exportVariable;
 /**
@@ -2250,7 +2654,7 @@ exports.setSecret = setSecret;
 function addPath(inputPath) {
     const filePath = process.env['GITHUB_PATH'] || '';
     if (filePath) {
-        file_command_1.issueCommand('PATH', inputPath);
+        file_command_1.issueFileCommand('PATH', inputPath);
     }
     else {
         command_1.issueCommand('add-path', {}, inputPath);
@@ -2290,7 +2694,10 @@ function getMultilineInput(name, options) {
     const inputs = getInput(name, options)
         .split('\n')
         .filter(x => x !== '');
-    return inputs;
+    if (options && options.trimWhitespace === false) {
+        return inputs;
+    }
+    return inputs.map(input => input.trim());
 }
 exports.getMultilineInput = getMultilineInput;
 /**
@@ -2323,8 +2730,12 @@ exports.getBooleanInput = getBooleanInput;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function setOutput(name, value) {
+    const filePath = process.env['GITHUB_OUTPUT'] || '';
+    if (filePath) {
+        return file_command_1.issueFileCommand('OUTPUT', file_command_1.prepareKeyValueMessage(name, value));
+    }
     process.stdout.write(os.EOL);
-    command_1.issueCommand('set-output', { name }, value);
+    command_1.issueCommand('set-output', { name }, utils_1.toCommandValue(value));
 }
 exports.setOutput = setOutput;
 /**
@@ -2453,7 +2864,11 @@ exports.group = group;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function saveState(name, value) {
-    command_1.issueCommand('save-state', { name }, value);
+    const filePath = process.env['GITHUB_STATE'] || '';
+    if (filePath) {
+        return file_command_1.issueFileCommand('STATE', file_command_1.prepareKeyValueMessage(name, value));
+    }
+    command_1.issueCommand('save-state', { name }, utils_1.toCommandValue(value));
 }
 exports.saveState = saveState;
 /**
@@ -2560,7 +2975,9 @@ function arrayIncludes (list) {
 
 function copy(src,dest){
 	for(var p in src){
-		dest[p] = src[p];
+		if (Object.prototype.hasOwnProperty.call(src, p)) {
+			dest[p] = src[p];
+		}
 	}
 }
 
@@ -3007,9 +3424,9 @@ Node.prototype = {
     		//console.dir(map)
     		if(map){
     			for(var n in map){
-    				if(map[n] == namespaceURI){
-    					return n;
-    				}
+						if (Object.prototype.hasOwnProperty.call(map, n) && map[n] === namespaceURI) {
+							return n;
+						}
     			}
     		}
     		el = el.nodeType == ATTRIBUTE_NODE?el.ownerDocument : el.parentNode;
@@ -3023,7 +3440,7 @@ Node.prototype = {
     		var map = el._nsMap;
     		//console.dir(map)
     		if(map){
-    			if(prefix in map){
+    			if(Object.prototype.hasOwnProperty.call(map, prefix)){
     				return map[prefix] ;
     			}
     		}
@@ -3089,48 +3506,67 @@ function _onRemoveAttribute(doc,el,newAttr,remove){
 	}
 }
 
-function _onUpdateChild(doc,el,newChild){
+/**
+ * Updates `el.childNodes`, updating the indexed items and it's `length`.
+ * Passing `newChild` means it will be appended.
+ * Otherwise it's assumed that an item has been removed,
+ * and `el.firstNode` and it's `.nextSibling` are used
+ * to walk the current list of child nodes.
+ *
+ * @param {Document} doc
+ * @param {Node} el
+ * @param {Node} [newChild]
+ * @private
+ */
+function _onUpdateChild (doc, el, newChild) {
 	if(doc && doc._inc){
 		doc._inc++;
 		//update childNodes
 		var cs = el.childNodes;
-		if(newChild){
+		if (newChild) {
 			cs[cs.length++] = newChild;
-		}else{
-			//console.log(1)
+		} else {
 			var child = el.firstChild;
 			var i = 0;
-			while(child){
+			while (child) {
 				cs[i++] = child;
-				child =child.nextSibling;
+				child = child.nextSibling;
 			}
 			cs.length = i;
+			delete cs[cs.length];
 		}
 	}
 }
 
 /**
- * attributes;
- * children;
- * 
- * writeable properties:
- * nodeValue,Attr:value,CharacterData:data
- * prefix
+ * Removes the connections between `parentNode` and `child`
+ * and any existing `child.previousSibling` or `child.nextSibling`.
+ *
+ * @see https://github.com/xmldom/xmldom/issues/135
+ * @see https://github.com/xmldom/xmldom/issues/145
+ *
+ * @param {Node} parentNode
+ * @param {Node} child
+ * @returns {Node} the child that was removed.
+ * @private
  */
-function _removeChild(parentNode,child){
+function _removeChild (parentNode, child) {
 	var previous = child.previousSibling;
 	var next = child.nextSibling;
-	if(previous){
+	if (previous) {
 		previous.nextSibling = next;
-	}else{
-		parentNode.firstChild = next
+	} else {
+		parentNode.firstChild = next;
 	}
-	if(next){
+	if (next) {
 		next.previousSibling = previous;
-	}else{
+	} else {
 		parentNode.lastChild = previous;
 	}
-	_onUpdateChild(parentNode.ownerDocument,parentNode);
+	child.parentNode = null;
+	child.previousSibling = null;
+	child.nextSibling = null;
+	_onUpdateChild(parentNode.ownerDocument, parentNode);
 	return child;
 }
 /**
@@ -3176,27 +3612,35 @@ function _insertBefore(parentNode,newChild,nextChild){
 	}
 	return newChild;
 }
-function _appendSingleChild(parentNode,newChild){
-	var cp = newChild.parentNode;
-	if(cp){
-		var pre = parentNode.lastChild;
-		cp.removeChild(newChild);//remove and update
-		var pre = parentNode.lastChild;
+
+/**
+ * Appends `newChild` to `parentNode`.
+ * If `newChild` is already connected to a `parentNode` it is first removed from it.
+ *
+ * @see https://github.com/xmldom/xmldom/issues/135
+ * @see https://github.com/xmldom/xmldom/issues/145
+ * @param {Node} parentNode
+ * @param {Node} newChild
+ * @returns {Node}
+ * @private
+ */
+function _appendSingleChild (parentNode, newChild) {
+	if (newChild.parentNode) {
+		newChild.parentNode.removeChild(newChild);
 	}
-	var pre = parentNode.lastChild;
 	newChild.parentNode = parentNode;
-	newChild.previousSibling = pre;
+	newChild.previousSibling = parentNode.lastChild;
 	newChild.nextSibling = null;
-	if(pre){
-		pre.nextSibling = newChild;
-	}else{
+	if (newChild.previousSibling) {
+		newChild.previousSibling.nextSibling = newChild;
+	} else {
 		parentNode.firstChild = newChild;
 	}
 	parentNode.lastChild = newChild;
-	_onUpdateChild(parentNode.ownerDocument,parentNode,newChild);
+	_onUpdateChild(parentNode.ownerDocument, parentNode, newChild);
 	return newChild;
-	//console.log("__aa",parentNode.lastChild.nextSibling == null)
 }
+
 Document.prototype = {
 	//implementation : null,
 	nodeName :  '#document',
@@ -3649,12 +4093,19 @@ function needNamespaceDefine(node, isHTML, visibleNamespaces) {
 }
 /**
  * Well-formed constraint: No < in Attribute Values
- * The replacement text of any entity referred to directly or indirectly in an attribute value must not contain a <.
- * @see https://www.w3.org/TR/xml/#CleanAttrVals
- * @see https://www.w3.org/TR/xml/#NT-AttValue
+ * > The replacement text of any entity referred to directly or indirectly
+ * > in an attribute value must not contain a <.
+ * @see https://www.w3.org/TR/xml11/#CleanAttrVals
+ * @see https://www.w3.org/TR/xml11/#NT-AttValue
+ *
+ * Literal whitespace other than space that appear in attribute values
+ * are serialized as their entity references, so they will be preserved.
+ * (In contrast to whitespace literals in the input which are normalized to spaces)
+ * @see https://www.w3.org/TR/xml11/#AVNormalize
+ * @see https://w3c.github.io/DOM-Parsing/#serializing-an-element-s-attributes
  */
 function addSerializedAttribute(buf, qualifiedName, value) {
-	buf.push(' ', qualifiedName, '="', value.replace(/[<&"]/g,_xmlEncoder), '"')
+	buf.push(' ', qualifiedName, '="', value.replace(/[<>&"\t\n\r]/g, _xmlEncoder), '"')
 }
 
 function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
@@ -3799,10 +4250,10 @@ function serializeToString(node,buf,isHTML,nodeFilter,visibleNamespaces){
 		 * and does not include the CDATA-section-close delimiter, `]]>`.
 		 *
 		 * @see https://www.w3.org/TR/xml/#NT-CharData
+		 * @see https://w3c.github.io/DOM-Parsing/#xml-serializing-a-text-node
 		 */
 		return buf.push(node.data
-			.replace(/[<&]/g,_xmlEncoder)
-			.replace(/]]>/g, ']]&gt;')
+			.replace(/[<&>]/g,_xmlEncoder)
 		);
 	case CDATA_SECTION_NODE:
 		return buf.push( '<![CDATA[',node.data,']]>');
@@ -3888,11 +4339,13 @@ function importNode(doc,node,deep){
 //					attributes:1,childNodes:1,parentNode:1,documentElement:1,doctype,};
 function cloneNode(doc,node,deep){
 	var node2 = new node.constructor();
-	for(var n in node){
-		var v = node[n];
-		if(typeof v != 'object' ){
-			if(v != node2[n]){
-				node2[n] = v;
+	for (var n in node) {
+		if (Object.prototype.hasOwnProperty.call(node, n)) {
+			var v = node[n];
+			if (typeof v != "object") {
+				if (v != node2[n]) {
+					node2[n] = v;
+				}
 			}
 		}
 	}
@@ -3997,6 +4450,36 @@ try{
 	exports.XMLSerializer = XMLSerializer;
 //}
 
+
+/***/ }),
+
+/***/ 498:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _crypto = _interopRequireDefault(__webpack_require__(417));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function sha1(bytes) {
+  if (Array.isArray(bytes)) {
+    bytes = Buffer.from(bytes);
+  } else if (typeof bytes === 'string') {
+    bytes = Buffer.from(bytes, 'utf8');
+  }
+
+  return _crypto.default.createHash('sha1').update(bytes).digest();
+}
+
+var _default = sha1;
+exports.default = _default;
 
 /***/ }),
 
@@ -4839,6 +5322,31 @@ function freeze(object, oc) {
 }
 
 /**
+ * Since we can not rely on `Object.assign` we provide a simplified version
+ * that is sufficient for our needs.
+ *
+ * @param {Object} target
+ * @param {Object | null | undefined} source
+ *
+ * @returns {Object} target
+ * @throws TypeError if target is not an object
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+ * @see https://tc39.es/ecma262/multipage/fundamental-objects.html#sec-object.assign
+ */
+function assign(target, source) {
+	if (target === null || typeof target !== 'object') {
+		throw new TypeError('target is not an object')
+	}
+	for (var key in source) {
+		if (Object.prototype.hasOwnProperty.call(source, key)) {
+			target[key] = source[key]
+		}
+	}
+	return target
+}
+
+/**
  * All mime types that are allowed as input to `DOMParser.parseFromString`
  *
  * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString#Argument02 MDN
@@ -4955,10 +5463,39 @@ var NAMESPACE = freeze({
 	XMLNS: 'http://www.w3.org/2000/xmlns/',
 })
 
+exports.assign = assign;
 exports.freeze = freeze;
 exports.MIME_TYPE = MIME_TYPE;
 exports.NAMESPACE = NAMESPACE;
 
+
+/***/ }),
+
+/***/ 695:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _validate = _interopRequireDefault(__webpack_require__(78));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function version(uuid) {
+  if (!(0, _validate.default)(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+
+  return parseInt(uuid.substr(14, 1), 16);
+}
+
+var _default = version;
+exports.default = _default;
 
 /***/ }),
 
@@ -5190,6 +5727,64 @@ var NAMESPACE = conventions.NAMESPACE;
 var ParseError = sax.ParseError;
 var XMLReader = sax.XMLReader;
 
+/**
+ * Normalizes line ending according to https://www.w3.org/TR/xml11/#sec-line-ends:
+ *
+ * > XML parsed entities are often stored in computer files which,
+ * > for editing convenience, are organized into lines.
+ * > These lines are typically separated by some combination
+ * > of the characters CARRIAGE RETURN (#xD) and LINE FEED (#xA).
+ * >
+ * > To simplify the tasks of applications, the XML processor must behave
+ * > as if it normalized all line breaks in external parsed entities (including the document entity)
+ * > on input, before parsing, by translating all of the following to a single #xA character:
+ * >
+ * > 1. the two-character sequence #xD #xA
+ * > 2. the two-character sequence #xD #x85
+ * > 3. the single character #x85
+ * > 4. the single character #x2028
+ * > 5. any #xD character that is not immediately followed by #xA or #x85.
+ *
+ * @param {string} input
+ * @returns {string}
+ */
+function normalizeLineEndings(input) {
+	return input
+		.replace(/\r[\n\u0085]/g, '\n')
+		.replace(/[\r\u0085\u2028]/g, '\n')
+}
+
+/**
+ * @typedef Locator
+ * @property {number} [columnNumber]
+ * @property {number} [lineNumber]
+ */
+
+/**
+ * @typedef DOMParserOptions
+ * @property {DOMHandler} [domBuilder]
+ * @property {Function} [errorHandler]
+ * @property {(string) => string} [normalizeLineEndings] used to replace line endings before parsing
+ * 						defaults to `normalizeLineEndings`
+ * @property {Locator} [locator]
+ * @property {Record<string, string>} [xmlns]
+ *
+ * @see normalizeLineEndings
+ */
+
+/**
+ * The DOMParser interface provides the ability to parse XML or HTML source code
+ * from a string into a DOM `Document`.
+ *
+ * _xmldom is different from the spec in that it allows an `options` parameter,
+ * to override the default behavior._
+ *
+ * @param {DOMParserOptions} [options]
+ * @constructor
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/DOMParser
+ * @see https://html.spec.whatwg.org/multipage/dynamic-markup-insertion.html#dom-parsing-and-serialization
+ */
 function DOMParser(options){
 	this.options = options ||{locator:{}};
 }
@@ -5213,10 +5808,15 @@ DOMParser.prototype.parseFromString = function(source,mimeType){
 		defaultNSMap[''] = NAMESPACE.HTML;
 	}
 	defaultNSMap.xml = defaultNSMap.xml || NAMESPACE.XML;
-	if(source && typeof source === 'string'){
-		sax.parse(source,defaultNSMap,entityMap);
-	}else{
-		sax.errorHandler.error("invalid doc source");
+	var normalize = options.normalizeLineEndings || normalizeLineEndings;
+	if (source && typeof source === 'string') {
+		sax.parse(
+			normalize(source),
+			defaultNSMap,
+			entityMap
+		)
+	} else {
+		sax.errorHandler.error('invalid doc source')
 	}
 	return domBuilder.doc;
 }
@@ -5435,18 +6035,53 @@ function appendElement (hander,node) {
 }//appendChild and setAttributeNS are preformance key
 
 exports.__DOMHandler = DOMHandler;
+exports.normalizeLineEndings = normalizeLineEndings;
 exports.DOMParser = DOMParser;
 
-/**
- * @deprecated Import/require from main entry point instead
- */
-exports.DOMImplementation = dom.DOMImplementation;
 
-/**
- * @deprecated Import/require from main entry point instead
- */
-exports.XMLSerializer = dom.XMLSerializer;
+/***/ }),
 
+/***/ 733:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _rng = _interopRequireDefault(__webpack_require__(844));
+
+var _stringify = _interopRequireDefault(__webpack_require__(411));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function v4(options, buf, offset) {
+  options = options || {};
+
+  const rnds = options.random || (options.rng || _rng.default)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
+
+
+  rnds[6] = rnds[6] & 0x0f | 0x40;
+  rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
+
+  if (buf) {
+    offset = offset || 0;
+
+    for (let i = 0; i < 16; ++i) {
+      buf[offset + i] = rnds[i];
+    }
+
+    return buf;
+  }
+
+  return (0, _stringify.default)(rnds);
+}
+
+var _default = v4;
+exports.default = _default;
 
 /***/ }),
 
@@ -5538,6 +6173,36 @@ exports.OidcClient = OidcClient;
 /***/ (function(module) {
 
 module.exports = require("fs");
+
+/***/ }),
+
+/***/ 803:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _crypto = _interopRequireDefault(__webpack_require__(417));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function md5(bytes) {
+  if (Array.isArray(bytes)) {
+    bytes = Buffer.from(bytes);
+  } else if (typeof bytes === 'string') {
+    bytes = Buffer.from(bytes, 'utf8');
+  }
+
+  return _crypto.default.createHash('md5').update(bytes).digest();
+}
+
+var _default = md5;
+exports.default = _default;
 
 /***/ }),
 
@@ -5875,6 +6540,151 @@ module.exports = {
     updateProxies
 }
 
+
+/***/ }),
+
+/***/ 844:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = rng;
+
+var _crypto = _interopRequireDefault(__webpack_require__(417));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+const rnds8Pool = new Uint8Array(256); // # of random values to pre-allocate
+
+let poolPtr = rnds8Pool.length;
+
+function rng() {
+  if (poolPtr > rnds8Pool.length - 16) {
+    _crypto.default.randomFillSync(rnds8Pool);
+
+    poolPtr = 0;
+  }
+
+  return rnds8Pool.slice(poolPtr, poolPtr += 16);
+}
+
+/***/ }),
+
+/***/ 893:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _rng = _interopRequireDefault(__webpack_require__(844));
+
+var _stringify = _interopRequireDefault(__webpack_require__(411));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// **`v1()` - Generate time-based UUID**
+//
+// Inspired by https://github.com/LiosK/UUID.js
+// and http://docs.python.org/library/uuid.html
+let _nodeId;
+
+let _clockseq; // Previous uuid creation time
+
+
+let _lastMSecs = 0;
+let _lastNSecs = 0; // See https://github.com/uuidjs/uuid for API details
+
+function v1(options, buf, offset) {
+  let i = buf && offset || 0;
+  const b = buf || new Array(16);
+  options = options || {};
+  let node = options.node || _nodeId;
+  let clockseq = options.clockseq !== undefined ? options.clockseq : _clockseq; // node and clockseq need to be initialized to random values if they're not
+  // specified.  We do this lazily to minimize issues related to insufficient
+  // system entropy.  See #189
+
+  if (node == null || clockseq == null) {
+    const seedBytes = options.random || (options.rng || _rng.default)();
+
+    if (node == null) {
+      // Per 4.5, create and 48-bit node id, (47 random bits + multicast bit = 1)
+      node = _nodeId = [seedBytes[0] | 0x01, seedBytes[1], seedBytes[2], seedBytes[3], seedBytes[4], seedBytes[5]];
+    }
+
+    if (clockseq == null) {
+      // Per 4.2.2, randomize (14 bit) clockseq
+      clockseq = _clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 0x3fff;
+    }
+  } // UUID timestamps are 100 nano-second units since the Gregorian epoch,
+  // (1582-10-15 00:00).  JSNumbers aren't precise enough for this, so
+  // time is handled internally as 'msecs' (integer milliseconds) and 'nsecs'
+  // (100-nanoseconds offset from msecs) since unix epoch, 1970-01-01 00:00.
+
+
+  let msecs = options.msecs !== undefined ? options.msecs : Date.now(); // Per 4.2.1.2, use count of uuid's generated during the current clock
+  // cycle to simulate higher resolution clock
+
+  let nsecs = options.nsecs !== undefined ? options.nsecs : _lastNSecs + 1; // Time since last uuid creation (in msecs)
+
+  const dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 10000; // Per 4.2.1.2, Bump clockseq on clock regression
+
+  if (dt < 0 && options.clockseq === undefined) {
+    clockseq = clockseq + 1 & 0x3fff;
+  } // Reset nsecs if clock regresses (new clockseq) or we've moved onto a new
+  // time interval
+
+
+  if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === undefined) {
+    nsecs = 0;
+  } // Per 4.2.1.2 Throw error if too many uuids are requested
+
+
+  if (nsecs >= 10000) {
+    throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
+  }
+
+  _lastMSecs = msecs;
+  _lastNSecs = nsecs;
+  _clockseq = clockseq; // Per 4.1.4 - Convert from unix epoch to Gregorian epoch
+
+  msecs += 12219292800000; // `time_low`
+
+  const tl = ((msecs & 0xfffffff) * 10000 + nsecs) % 0x100000000;
+  b[i++] = tl >>> 24 & 0xff;
+  b[i++] = tl >>> 16 & 0xff;
+  b[i++] = tl >>> 8 & 0xff;
+  b[i++] = tl & 0xff; // `time_mid`
+
+  const tmh = msecs / 0x100000000 * 10000 & 0xfffffff;
+  b[i++] = tmh >>> 8 & 0xff;
+  b[i++] = tmh & 0xff; // `time_high_and_version`
+
+  b[i++] = tmh >>> 24 & 0xf | 0x10; // include version
+
+  b[i++] = tmh >>> 16 & 0xff; // `clock_seq_hi_and_reserved` (Per 4.2.2 - include variant)
+
+  b[i++] = clockseq >>> 8 | 0x80; // `clock_seq_low`
+
+  b[i++] = clockseq & 0xff; // `node`
+
+  for (let n = 0; n < 6; ++n) {
+    b[i + n] = node[n];
+  }
+
+  return buf || (0, _stringify.default)(b);
+}
+
+var _default = v1;
+exports.default = _default;
 
 /***/ })
 
