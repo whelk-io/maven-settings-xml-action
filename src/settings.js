@@ -226,7 +226,10 @@ function updateProfiles(templateXml) {
         templateXml.getElementsByTagName('profiles')[0];
 
     JSON.parse(profilesInput).forEach((profileInput) => {
-        var profileXml = templateXml.createElement('profile');
+        var profileXml = templateXml.getElementsByTagName('profile')[0];
+        if (!profileXml){
+            profileXml = templateXml.createElement('profile');
+        }
         for (var key in profileInput) {
             var keyXml = templateXml.createElement(key);
             var child = profileInput[key];
