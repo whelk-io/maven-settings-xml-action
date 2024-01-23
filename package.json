@@ -13,13 +13,13 @@
     "os": "^0.1.1",
     "path": "^0.12.7",
     "xml-formatter": "^2.4.0",
-    "@xmldom/xmldom": "^0.8.3"
+    "@xmldom/xmldom": "^0.8.10"
   },
   "devDependencies": {
     "@zeit/ncc": "^0.20.5",
     "eslint": "^7.3.0",
-    "eslint-plugin-mocha": "^7.0.1",
-    "mocha": "^10.0.0",
+    "eslint-plugin-mocha": "^10.2.0",
+    "mocha": "^10.2.0",
     "mocha-eslint": "^6.0.0"
   },
   "scripts": {
