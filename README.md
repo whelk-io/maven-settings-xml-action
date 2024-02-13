@@ -102,7 +102,7 @@ Reference: [Maven Settings > Proxies](https://maven.apache.org/settings.html#pro
 
 When using a custom `output_file`, for example:
 ```yaml
-- uses: whelk-io/maven-settings-xml-action@v20
+- uses: whelk-io/maven-settings-xml-action@v22
   with:
     output_file: foo/custom.xml
 ```
@@ -115,7 +115,7 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v20
+  uses: whelk-io/maven-settings-xml-action@v22
   with:
     repositories: '[{ "id": "some-repository", "url": "http://some.repository.url" }]'
     plugin_repositories: '[{ "id": "some-plugin-repository", "url": "http://some.plugin.repository.url" }]'
@@ -169,7 +169,7 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
 
 ````yaml
 - name: maven-settings-xml-action
-  uses: whelk-io/maven-settings-xml-action@v20
+  uses: whelk-io/maven-settings-xml-action@v22
   with:
     repositories: >
       [
@@ -372,7 +372,7 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
 
 ## Local Setup
 
-See [CONTRIBUTING.md](Contributing) for guidelines for forking and contributing to this project.
+See [Contributing](CONTRIBUTING.md) for guidelines for forking and contributing to this project.
 
 **Install Dependencies**
 
