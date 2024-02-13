@@ -372,7 +372,7 @@ The generated `settings.xml` will be created at `/home/runner/work/{repo}/foo/cu
 
 ## Local Setup
 
-See [CONTRIBUTING.md](Contributing) for guidelines for forking and contributing to this project.
+See [Contributing](CONTRIBUTING.md) for guidelines for forking and contributing to this project.
 
 **Install Dependencies**
 
