@@ -13,7 +13,7 @@
     "os": "^0.1.1",
     "path": "^0.12.7",
     "xml-formatter": "^2.4.0",
-    "@xmldom/xmldom": "^0.8.3"
+    "@xmldom/xmldom": "^0.8.4"
   },
   "devDependencies": {
     "@zeit/ncc": "^0.20.5",
